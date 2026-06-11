@@ -1136,16 +1136,23 @@ button {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  width: 100%;
 }
 
 .header-value-edit input {
   flex: 1;
 }
 
+.header-value-edit > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .content-type-editor {
   position: relative;
   display: inline-flex;
   align-items: stretch;
+  flex: 1 1 auto;
   min-width: 0;
   width: 100%;
 }
@@ -1216,8 +1223,10 @@ button {
 }
 
 .header-row-button {
+  flex: 0 0 auto;
   height: 24px;
   padding: 0 8px;
+  white-space: nowrap;
 }
 
 .header-actions {

@@ -27,6 +27,7 @@ import {
   normaliseResendResult
 } from "./records";
 import {
+  findHeader,
   isContentTypeHeader,
   isProtectedRequestHeader,
   removeHeaderAt,
@@ -697,6 +698,7 @@ function RequestDetails(props: {
 
   const disabledReason = translateReason(props.record.unsupportedReason);
   const queryParams = useMemo(() => parseQueryParams(url), [url]);
+  const requestBodyMimeType = findHeader(requestHeaders, "content-type") ?? props.record.requestBody.mimeType;
 
   function beginHeaderValueFocus(index: number) {
     setFocusHeaderIndex(index);
@@ -855,6 +857,7 @@ function RequestDetails(props: {
         {props.activeTab === "payload" ? (
           <PayloadEditor
             bodyCapture={props.record.requestBody}
+            mimeType={requestBodyMimeType}
             queryParams={queryParams}
             body={body}
             onQueryParamsChange={(nextQueryParams) => setUrl(replaceUrlQuery(url, nextQueryParams))}
@@ -950,6 +953,7 @@ function HeadersView(props: {
 
 function PayloadEditor(props: {
   bodyCapture: BodyCapture;
+  mimeType?: string;
   queryParams: HeaderPair[];
   body: string;
   onQueryParamsChange: (queryParams: HeaderPair[]) => void;
@@ -975,7 +979,7 @@ function PayloadEditor(props: {
           <button
             type="button"
             className="text-button section-action"
-            onClick={() => props.onBodyChange(formatCodeText(props.body, props.bodyCapture.mimeType))}
+            onClick={() => props.onBodyChange(formatCodeText(props.body, props.mimeType))}
           >
             {i18n.details.format}
           </button>
@@ -990,6 +994,7 @@ function PayloadEditor(props: {
         <EditableCodeEditor
           value={props.body}
           placeholder={i18n.details.editRequestBody}
+          mimeType={props.mimeType}
           onChange={props.onBodyChange}
         />
       </section>
@@ -1017,7 +1022,8 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 }
 
 function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
-  const lines = tokenizeCode(formatCodeText(text, mimeType));
+  const formattedText = formatCodeText(text, mimeType);
+  const lines = tokenizeCode(formattedText, mimeType);
 
   return (
     <div className="code-view">
@@ -1040,10 +1046,11 @@ function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
 function EditableCodeEditor(props: {
   value: string;
   placeholder: string;
+  mimeType?: string;
   onChange: (value: string) => void;
 }) {
   const highlightRef = useRef<HTMLDivElement>(null);
-  const lines = tokenizeCode(props.value);
+  const lines = tokenizeCode(props.value, props.mimeType);
 
   return (
     <div className="editable-code-editor">

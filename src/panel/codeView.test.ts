@@ -28,4 +28,28 @@ describe("code tokenization", () => {
       ])
     );
   });
+
+  it("highlights form-urlencoded keys and values separately", () => {
+    const [line] = tokenizeCode("a=b&c=d", "application/x-www-form-urlencoded");
+
+    expect(line.tokens).toEqual([
+      { kind: "property", text: "a" },
+      { kind: "plain", text: "=" },
+      { kind: "string", text: "b" },
+      { kind: "plain", text: "&" },
+      { kind: "property", text: "c" },
+      { kind: "plain", text: "=" },
+      { kind: "string", text: "d" }
+    ]);
+  });
+
+  it("also highlights form-urlencoded when the Content-Type includes charset", () => {
+    const [line] = tokenizeCode(
+      "a=b&c=d",
+      "application/x-www-form-urlencoded; charset=UTF-8"
+    );
+
+    expect(line.tokens[0]).toEqual({ kind: "property", text: "a" });
+    expect(line.tokens[2]).toEqual({ kind: "string", text: "b" });
+  });
 });

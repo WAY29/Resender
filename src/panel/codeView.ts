@@ -34,16 +34,20 @@ export function formatCodeText(text: string, mimeType?: string): string {
   }
 }
 
-export function tokenizeCode(text: string): CodeLine[] {
+export function tokenizeCode(text: string, mimeType?: string): CodeLine[] {
   const lines = text.split(/\r?\n/);
 
   return lines.map((line, index) => ({
     lineNumber: index + 1,
-    tokens: tokenizeLine(line)
+    tokens: tokenizeLine(line, mimeType)
   }));
 }
 
-function tokenizeLine(line: string): CodeToken[] {
+function tokenizeLine(line: string, mimeType?: string): CodeToken[] {
+  if (mimeType?.toLowerCase().includes("application/x-www-form-urlencoded")) {
+    return tokenizeFormUrlEncodedLine(line);
+  }
+
   const tokens: CodeToken[] = [];
   const pattern =
     /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|\b(true|false)\b|\bnull\b/g;
@@ -76,4 +80,31 @@ function tokenizeLine(line: string): CodeToken[] {
   }
 
   return tokens.length > 0 ? tokens : [{ kind: "plain", text: line }];
+}
+
+function tokenizeFormUrlEncodedLine(line: string): CodeToken[] {
+  if (line.length === 0) {
+    return [{ kind: "plain", text: line }];
+  }
+
+  const tokens: CodeToken[] = [];
+  const segments = line.split("&");
+
+  segments.forEach((segment, index) => {
+    if (index > 0) {
+      tokens.push({ kind: "plain", text: "&" });
+    }
+
+    const separatorIndex = segment.indexOf("=");
+    if (separatorIndex === -1) {
+      tokens.push({ kind: "property", text: segment });
+      return;
+    }
+
+    tokens.push({ kind: "property", text: segment.slice(0, separatorIndex) });
+    tokens.push({ kind: "plain", text: "=" });
+    tokens.push({ kind: "string", text: segment.slice(separatorIndex + 1) });
+  });
+
+  return tokens;
 }
