@@ -36,6 +36,10 @@ export function formatDuration(value?: number): string {
 export function getDisplayName(url: string): string {
   try {
     const parsed = new URL(url);
+    if (parsed.protocol === "data:") {
+      return url;
+    }
+
     return `${parsed.pathname.split("/").filter(Boolean).at(-1) ?? parsed.hostname}${parsed.search}`;
   } catch {
     return url;
