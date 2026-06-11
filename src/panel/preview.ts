@@ -85,6 +85,47 @@ export function getDefaultPreviewScale(mimeType?: string): number {
   return simplifyContentType(mimeType) === "image/svg+xml" ? 0.75 : 1;
 }
 
+export function getFittedPreviewScale(options: {
+  containerWidth: number;
+  containerHeight: number;
+  contentWidth: number;
+  contentHeight: number;
+  defaultScale?: number;
+  padding?: number;
+  horizontalPadding?: number;
+  verticalPadding?: number;
+}): number {
+  const {
+    containerWidth,
+    containerHeight,
+    contentWidth,
+    contentHeight,
+    defaultScale = 1,
+    padding = 24,
+    horizontalPadding = padding,
+    verticalPadding = padding
+  } = options;
+
+  if (
+    !Number.isFinite(containerWidth) ||
+    !Number.isFinite(containerHeight) ||
+    !Number.isFinite(contentWidth) ||
+    !Number.isFinite(contentHeight) ||
+    containerWidth <= 0 ||
+    containerHeight <= 0 ||
+    contentWidth <= 0 ||
+    contentHeight <= 0
+  ) {
+    return defaultScale;
+  }
+
+  const availableWidth = Math.max(1, containerWidth - horizontalPadding);
+  const availableHeight = Math.max(1, containerHeight - verticalPadding);
+  const fitScale = Math.min(availableWidth / contentWidth, availableHeight / contentHeight);
+
+  return Number(Math.max(0.1, Math.min(defaultScale, fitScale)).toFixed(3));
+}
+
 export function describeJsonValue(value: JsonValue): string {
   if (Array.isArray(value)) {
     return value.length === 0 ? "[]" : `Array(${value.length})`;

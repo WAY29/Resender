@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FocusEvent } from "react";
 import type {
   BodyCapture,
@@ -40,6 +40,7 @@ import {
   buildSvgDataUrl,
   describeJsonValue,
   getDefaultPreviewScale,
+  getFittedPreviewScale,
   getJsonChildren,
   getPreviewModel,
   isJsonComposite,
@@ -875,7 +876,7 @@ function RequestDetails(props: {
             onBodyChange={setBody}
           />
         ) : null}
-        {props.activeTab === "preview" ? <PreviewView record={props.record} /> : null}
+        {props.activeTab === "preview" ? <PreviewView key={props.record.id} record={props.record} /> : null}
         {props.activeTab === "response" ? <BodyView title={i18n.details.response} body={props.record.responseBody} /> : null}
       </div>
     </aside>
@@ -1054,16 +1055,139 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 
 function PreviewView({ record }: { record: NetworkRecord }) {
   const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
+  const imageSrc = useMemo(
+    () => (preview.kind === "svg" ? buildSvgDataUrl(preview.text) : preview.kind === "image" ? preview.dataUrl : undefined),
+    [preview]
+  );
   const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(record.responseBody.mimeType));
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>();
+  const [imageViewportHeight, setImageViewportHeight] = useState<number>();
+  const [hasManualZoom, setHasManualZoom] = useState(false);
+  const [isImageReady, setIsImageReady] = useState(false);
+  const imageScrollRef = useRef<HTMLDivElement>(null);
+  const imageShellRef = useRef<HTMLDivElement>(null);
+  const fitRafRef = useRef<number | undefined>(undefined);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPreviewScale(getDefaultPreviewScale(record.responseBody.mimeType));
-  }, [record.id, record.responseBody.mimeType]);
+    setHasManualZoom(false);
+    setImageNaturalSize(undefined);
+    setImageViewportHeight(undefined);
+    setIsImageReady(false);
+  }, [record.id, record.responseBody.mimeType, imageSrc]);
 
   useEffect(() => {
-    setImageNaturalSize(undefined);
-  }, [record.id, preview.kind === "svg" ? preview.text : preview.kind === "image" ? preview.dataUrl : undefined]);
+    if (!imageSrc) {
+      return;
+    }
+
+    let cancelled = false;
+    const image = new Image();
+
+    image.onload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        setImageNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
+      }
+    };
+
+    image.src = imageSrc;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [record.id, imageSrc]);
+
+  useLayoutEffect(() => {
+    if (!imageNaturalSize || !imageScrollRef.current || (preview.kind !== "svg" && preview.kind !== "image")) {
+      return;
+    }
+
+    const naturalSize = imageNaturalSize;
+    const previewMimeType = preview.mimeType;
+    const imageScroll = imageScrollRef.current;
+    const detailsContent = imageScroll.closest(".details-content");
+
+    function fitToContainer() {
+      if (!imageScrollRef.current) {
+        return false;
+      }
+
+      const fallbackHeight = imageScroll.clientHeight || 220;
+      const availableHeight =
+        detailsContent instanceof HTMLElement
+          ? Math.max(120, Math.floor(detailsContent.getBoundingClientRect().bottom - imageScroll.getBoundingClientRect().top))
+          : fallbackHeight;
+      const shellStyles = imageShellRef.current ? window.getComputedStyle(imageShellRef.current) : undefined;
+      const horizontalChrome: number = shellStyles
+        ? ["paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"].reduce(
+            (sum, key) => sum + (Number.parseFloat(shellStyles[key as keyof CSSStyleDeclaration] as string) || 0),
+            0
+          )
+        : 26;
+      const verticalChrome: number = shellStyles
+        ? ["paddingTop", "paddingBottom", "borderTopWidth", "borderBottomWidth"].reduce(
+            (sum, key) => sum + (Number.parseFloat(shellStyles[key as keyof CSSStyleDeclaration] as string) || 0),
+            0
+          )
+        : 26;
+
+      if (imageScroll.clientWidth <= 0 || availableHeight <= 0) {
+        return false;
+      }
+
+      setImageViewportHeight(availableHeight);
+      if (!hasManualZoom) {
+        setPreviewScale(
+          getFittedPreviewScale({
+            containerWidth: imageScroll.clientWidth,
+            containerHeight: availableHeight,
+            contentWidth: naturalSize.width,
+            contentHeight: naturalSize.height,
+            defaultScale: getDefaultPreviewScale(previewMimeType),
+            horizontalPadding: horizontalChrome,
+            verticalPadding: verticalChrome + 4
+          })
+        );
+      }
+      setIsImageReady(true);
+      return true;
+    }
+
+    function scheduleFit() {
+      if (fitRafRef.current !== undefined) {
+        window.cancelAnimationFrame(fitRafRef.current);
+      }
+
+      fitRafRef.current = window.requestAnimationFrame(() => {
+        fitRafRef.current = undefined;
+        void fitToContainer();
+      });
+    }
+
+    scheduleFit();
+    window.addEventListener("resize", scheduleFit);
+
+    const observer = new ResizeObserver(() => {
+      scheduleFit();
+    });
+    observer.observe(imageScroll);
+    if (detailsContent instanceof HTMLElement) {
+      observer.observe(detailsContent);
+    }
+
+    return () => {
+      window.removeEventListener("resize", scheduleFit);
+      if (fitRafRef.current !== undefined) {
+        window.cancelAnimationFrame(fitRafRef.current);
+        fitRafRef.current = undefined;
+      }
+      observer.disconnect();
+    };
+  }, [hasManualZoom, imageNaturalSize, preview]);
 
   return (
     <div className="preview-view">
@@ -1076,7 +1200,10 @@ function PreviewView({ record }: { record: NetworkRecord }) {
               className="text-button section-action preview-zoom-button"
               aria-label="Zoom out"
               title="Zoom out"
-              onClick={() => setPreviewScale((current) => Math.max(0.25, Number((current - 0.1).toFixed(2))))}
+              onClick={() => {
+                setHasManualZoom(true);
+                setPreviewScale((current) => Math.max(0.25, Number((current - 0.1).toFixed(2))));
+              }}
             >
               -
             </button>
@@ -1085,7 +1212,10 @@ function PreviewView({ record }: { record: NetworkRecord }) {
               className="text-button section-action preview-zoom-button"
               aria-label="Zoom in"
               title="Zoom in"
-              onClick={() => setPreviewScale((current) => Math.min(3, Number((current + 0.1).toFixed(2))))}
+              onClick={() => {
+                setHasManualZoom(true);
+                setPreviewScale((current) => Math.min(3, Number((current + 0.1).toFixed(2))));
+              }}
             >
               +
             </button>
@@ -1093,21 +1223,20 @@ function PreviewView({ record }: { record: NetworkRecord }) {
         ) : null}
       </div>
       {preview.kind === "svg" || preview.kind === "image" ? (
-        <div className="preview-image-scroll">
-          <div className="preview-image-shell">
-            <img
-              className="preview-image"
-              style={imageNaturalSize ? { width: `${imageNaturalSize.width * previewScale}px` } : undefined}
-              src={preview.kind === "svg" ? buildSvgDataUrl(preview.text) : preview.dataUrl}
-              alt="Preview"
-              onLoad={(event) => {
-                const nextWidth = event.currentTarget.naturalWidth;
-                const nextHeight = event.currentTarget.naturalHeight;
-                if (nextWidth > 0 && nextHeight > 0) {
-                  setImageNaturalSize({ width: nextWidth, height: nextHeight });
-                }
-              }}
-            />
+        <div
+          className="preview-image-scroll"
+          ref={imageScrollRef}
+          style={{ height: `${imageViewportHeight ?? 220}px` }}
+        >
+          <div className="preview-image-shell" ref={imageShellRef}>
+            {imageSrc && isImageReady ? (
+              <img
+                className="preview-image"
+                style={imageNaturalSize ? { width: `${imageNaturalSize.width * previewScale}px` } : undefined}
+                src={imageSrc}
+                alt="Preview"
+              />
+            ) : null}
           </div>
         </div>
       ) : null}

@@ -6,6 +6,7 @@ import {
   buildSvgDataUrl,
   describeJsonValue,
   getDefaultPreviewScale,
+  getFittedPreviewScale,
   getJsonChildren,
   getPreviewModel,
   isJsonComposite
@@ -116,6 +117,44 @@ describe("preview scale helpers", () => {
   it("uses a smaller default scale for svg previews", () => {
     expect(getDefaultPreviewScale("image/svg+xml")).toBe(0.75);
     expect(getDefaultPreviewScale("text/html")).toBe(1);
+  });
+
+  it("fits oversized content into the available preview area", () => {
+    expect(
+      getFittedPreviewScale({
+        containerWidth: 500,
+        containerHeight: 300,
+        contentWidth: 1000,
+        contentHeight: 600,
+        defaultScale: 1
+      })
+    ).toBe(0.46);
+  });
+
+  it("supports separate horizontal and vertical chrome deductions", () => {
+    expect(
+      getFittedPreviewScale({
+        containerWidth: 500,
+        containerHeight: 300,
+        contentWidth: 1000,
+        contentHeight: 600,
+        defaultScale: 1,
+        horizontalPadding: 40,
+        verticalPadding: 60
+      })
+    ).toBe(0.4);
+  });
+
+  it("does not upscale smaller content beyond the default scale", () => {
+    expect(
+      getFittedPreviewScale({
+        containerWidth: 800,
+        containerHeight: 600,
+        contentWidth: 200,
+        contentHeight: 100,
+        defaultScale: 0.75
+      })
+    ).toBe(0.75);
   });
 });
 

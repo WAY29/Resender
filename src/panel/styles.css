@@ -1000,7 +1000,6 @@ button {
 }
 
 .preview-image-scroll {
-  min-height: 220px;
   overflow: auto;
 }
 
