@@ -366,6 +366,68 @@ describe("findMergeTarget", () => {
     expect(linkedUnrelated).not.toHaveProperty("redirectSourceId");
   });
 
+  it("links ordinary zero-status and success pairs for the same request url", () => {
+    const pending = record("har:pending", {
+      method: "GET",
+      url: "https://assets.example.test/img/icon-lock.gif",
+      name: "icon-lock.gif",
+      type: "image",
+      status: 0,
+      statusText: "",
+      initiator: "index.js:41",
+      responseHeaders: [],
+      startedAt: 1000
+    });
+    const final = record("har:final", {
+      method: "GET",
+      url: "https://assets.example.test/img/icon-lock.gif",
+      name: "icon-lock.gif",
+      type: "image",
+      status: 200,
+      initiator: "index.js:41",
+      startedAt: 1200
+    });
+
+    expect(linkRedirectRecords([pending, final])).toEqual([
+      expect.objectContaining({
+        id: "har:pending",
+        status: 301,
+        statusText: "Redirect",
+        redirectTargetId: "har:final",
+        redirectTargetUrl: final.url
+      }),
+      expect.objectContaining({ id: "har:final", redirectSourceId: "har:pending" })
+    ]);
+  });
+
+  it("does not link ordinary zero-status and success pairs with different initiators", () => {
+    const pending = record("har:pending", {
+      method: "GET",
+      url: "https://assets.example.test/img/icon-lock.gif",
+      name: "icon-lock.gif",
+      type: "image",
+      status: 0,
+      statusText: "",
+      initiator: "index.js:41",
+      responseHeaders: [],
+      startedAt: 1000
+    });
+    const final = record("har:final", {
+      method: "GET",
+      url: "https://assets.example.test/img/icon-lock.gif",
+      name: "icon-lock.gif",
+      type: "image",
+      status: 200,
+      initiator: "other.js:2",
+      startedAt: 1200
+    });
+
+    const [left, right] = linkRedirectRecords([pending, final]);
+
+    expect(left).not.toHaveProperty("redirectTargetId");
+    expect(right).not.toHaveProperty("redirectSourceId");
+  });
+
   it("infers Chrome extension dynamic URL redirects from paired zero-status records", () => {
     const dynamicUrl = record("har:dynamic", {
       method: "GET",

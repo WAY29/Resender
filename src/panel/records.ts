@@ -275,11 +275,11 @@ export function findMergeTarget(
 
 export function linkRedirectRecords(records: NetworkRecord[]): NetworkRecord[] {
   const inferredRecords = records.map((record) => {
-    if (record.status !== 0 || record.redirectTargetUrl || !isChromeExtensionUrl(record.url)) {
+    if (record.status !== 0 || record.redirectTargetUrl) {
       return record;
     }
 
-    const target = records.find((candidate) => isLikelyExtensionRedirectTarget(record, candidate));
+    const target = records.find((candidate) => isLikelyZeroStatusTarget(record, candidate));
     return target
       ? {
           ...record,
@@ -317,7 +317,7 @@ export function linkRedirectRecords(records: NetworkRecord[]): NetworkRecord[] {
   return inferStylesheetInitiators(linkedRecords);
 }
 
-function isLikelyExtensionRedirectTarget(source: NetworkRecord, candidate: NetworkRecord): boolean {
+function isLikelyZeroStatusTarget(source: NetworkRecord, candidate: NetworkRecord): boolean {
   const closeInTime = candidate.startedAt >= source.startedAt && candidate.startedAt - source.startedAt < 1000;
   if (
     source.id === candidate.id ||
@@ -326,8 +326,17 @@ function isLikelyExtensionRedirectTarget(source: NetworkRecord, candidate: Netwo
     candidate.status < 200 ||
     candidate.status >= 400 ||
     !closeInTime ||
-    !isChromeExtensionUrl(candidate.url)
+    source.responseHeaders.length > 0 ||
+    source.initiator !== candidate.initiator
   ) {
+    return false;
+  }
+
+  if (source.url === candidate.url) {
+    return true;
+  }
+
+  if (!isChromeExtensionUrl(source.url) || !isChromeExtensionUrl(candidate.url)) {
     return false;
   }
 
@@ -337,13 +346,7 @@ function isLikelyExtensionRedirectTarget(source: NetworkRecord, candidate: Netwo
     return false;
   }
 
-  return (
-    sourceUrl.pathname === candidateUrl.pathname &&
-    sourceUrl.search === candidateUrl.search &&
-    source.name === candidate.name &&
-    source.initiator === candidate.initiator &&
-    source.responseHeaders.length === 0
-  );
+  return sourceUrl.pathname === candidateUrl.pathname && sourceUrl.search === candidateUrl.search && source.name === candidate.name;
 }
 
 function isChromeExtensionUrl(url: string): boolean {
