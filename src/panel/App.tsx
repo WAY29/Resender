@@ -1361,6 +1361,7 @@ function EditablePairList(props: {
   const [editingIndex, setEditingIndex] = useState<number>();
   const [draftName, setDraftName] = useState("");
   const [draftValue, setDraftValue] = useState("");
+  const [editingFocusTarget, setEditingFocusTarget] = useState<"name" | "value">("name");
 
   useEffect(() => {
     if (props.focusIndex === undefined) {
@@ -1374,12 +1375,14 @@ function EditablePairList(props: {
     }
 
     setEditingIndex(props.focusIndex);
+    setEditingFocusTarget(props.focusValue ? "value" : "name");
     setDraftName(pair.name);
     setDraftValue(pair.value);
-  }, [props.focusIndex, props.onClearFocus, props.pairs]);
+  }, [props.focusIndex, props.focusValue, props.onClearFocus, props.pairs]);
 
   function beginEdit(index: number, pair: HeaderPair) {
     setEditingIndex(index);
+    setEditingFocusTarget("value");
     setDraftName(pair.name);
     setDraftValue(pair.value);
   }
@@ -1420,8 +1423,8 @@ function EditablePairList(props: {
           readonlyLabel={props.readonlyLabel}
           editLabel={props.editLabel}
           removeLabel={props.removeLabel}
-          autoFocusName={props.focusIndex === index && !props.focusValue}
-          autoFocusValue={props.focusIndex === index && Boolean(props.focusValue)}
+          autoFocusName={editingIndex === index && editingFocusTarget === "name"}
+          autoFocusValue={editingIndex === index && editingFocusTarget === "value"}
           onAutoFocusHandled={props.onClearFocus}
         />
       ))}
@@ -1432,6 +1435,7 @@ function EditablePairList(props: {
           const nextPair = { name: props.defaultName, value: "" };
           props.onChange([...props.pairs, nextPair]);
           setEditingIndex(props.pairs.length);
+          setEditingFocusTarget("name");
           setDraftName(nextPair.name);
           setDraftValue(nextPair.value);
         }}
