@@ -1464,6 +1464,8 @@ function EditablePairRow(props: {
 }) {
   const isReadonly = props.isReadonly?.(props.pair) ?? false;
   const isEditing = props.editingIndex === props.index;
+  const shouldAutoFocusName = props.autoFocusName || (!props.autoFocusName && !props.autoFocusValue);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   function handleRowBlur(event: FocusEvent<HTMLDivElement>) {
     if (!isEditing || isReadonly) {
@@ -1477,6 +1479,13 @@ function EditablePairRow(props: {
 
     props.onCommitEdit();
   }
+
+  useEffect(() => {
+    if (isEditing && shouldAutoFocusName) {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }
+  }, [isEditing, shouldAutoFocusName]);
 
   useEffect(() => {
     if (isEditing && (props.autoFocusName || props.autoFocusValue)) {
@@ -1495,8 +1504,9 @@ function EditablePairRow(props: {
       {isEditing && !isReadonly ? (
         <>
           <input
+            ref={nameInputRef}
             className="header-name-input"
-            autoFocus={props.autoFocusName}
+            autoFocus={shouldAutoFocusName}
             value={props.draftName}
             onChange={(event) => props.onDraftNameChange(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -1508,7 +1518,7 @@ function EditablePairRow(props: {
             <HeaderValueEditor
               name={props.draftName}
               value={props.draftValue}
-              autoFocus={props.autoFocusValue || (!props.autoFocusName && !props.autoFocusValue)}
+              autoFocus={Boolean(props.autoFocusValue)}
               onChange={props.onDraftValueChange}
               onKeyDown={(event) => {
                 if (event.key === "Enter") props.onCommitEdit();
