@@ -52,4 +52,46 @@ describe("code tokenization", () => {
     expect(line.tokens[0]).toEqual({ kind: "property", text: "a" });
     expect(line.tokens[2]).toEqual({ kind: "string", text: "b" });
   });
+
+  it("highlights CSS bodies using CSS token classes", () => {
+    const [line] = tokenizeCode("body { color: red; margin: 0; }", "text/css");
+
+    expect(line.tokens).toEqual(
+      expect.arrayContaining([
+        { kind: "property", text: "color" },
+        { kind: "string", text: "red" },
+        { kind: "property", text: "margin" },
+        { kind: "number", text: "0" }
+      ])
+    );
+  });
+
+  it("highlights JavaScript bodies using JavaScript token classes", () => {
+    const [line] = tokenizeCode('const ok = true; let count = 2; const name = "resender";', "application/javascript");
+
+    expect(line.tokens).toEqual(
+      expect.arrayContaining([
+        { kind: "boolean", text: "const" },
+        { kind: "boolean", text: "let" },
+        { kind: "boolean", text: "true" },
+        { kind: "number", text: "2" },
+        { kind: "string", text: '"resender"' }
+      ])
+    );
+  });
+
+  it("highlights HTML bodies using tag-aware token classes", () => {
+    const [line] = tokenizeCode('<div class="box">hi</div>', "text/html");
+
+    expect(line.tokens).toEqual([
+      { kind: "boolean", text: "<div" },
+      { kind: "plain", text: " " },
+      { kind: "property", text: "class" },
+      { kind: "plain", text: "=" },
+      { kind: "string", text: '"box"' },
+      { kind: "boolean", text: ">" },
+      { kind: "plain", text: "hi" },
+      { kind: "boolean", text: "</div>" }
+    ]);
+  });
 });
