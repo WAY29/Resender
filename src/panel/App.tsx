@@ -33,6 +33,11 @@ import {
 } from "./headers";
 import { formatCodeText, tokenizeCode } from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
+import {
+  normaliseUrlQueryEncoding,
+  parseQueryParams,
+  replaceUrlQuery
+} from "./queryParams";
 import { nextSortState, sortRecords, type SortColumn, type SortState } from "./requestSort";
 import { getFilterTypes, getRequestColumns, i18n, translateReason } from "./i18n";
 import { parseImportedRecords } from "./importExport";
@@ -671,16 +676,22 @@ function RequestDetails(props: {
   }, [props.record]);
 
   const disabledReason = translateReason(props.record.unsupportedReason);
+  const queryParams = useMemo(() => parseQueryParams(url), [url]);
 
   async function send() {
     if (disabledReason) {
       return;
     }
 
+    const requestUrl = normaliseUrlQueryEncoding(url);
+    if (requestUrl !== url) {
+      setUrl(requestUrl);
+    }
+
     const { editable } = splitEditableHeaders(requestHeaders);
     const draft: ResendDraft = {
       method,
-      url,
+      url: requestUrl,
       headers: editable,
       body,
       credentials,
@@ -750,7 +761,9 @@ function RequestDetails(props: {
         {props.activeTab === "payload" ? (
           <PayloadEditor
             bodyCapture={props.record.requestBody}
+            queryParams={queryParams}
             body={body}
+            onQueryParamsChange={(nextQueryParams) => setUrl(replaceUrlQuery(url, nextQueryParams))}
             onBodyChange={setBody}
           />
         ) : null}
@@ -825,7 +838,9 @@ function HeadersView(props: {
 
 function PayloadEditor(props: {
   bodyCapture: BodyCapture;
+  queryParams: HeaderPair[];
   body: string;
+  onQueryParamsChange: (queryParams: HeaderPair[]) => void;
   onBodyChange: (body: string) => void;
 }) {
   const unavailable =
@@ -836,8 +851,15 @@ function PayloadEditor(props: {
 
   return (
     <div className="payload-editor">
+      <DetailSection title={i18n.details.getQuery}>
+        <EditableQueryParamList
+          params={props.queryParams}
+          onChange={props.onQueryParamsChange}
+        />
+      </DetailSection>
+      <section className="detail-section">
       <div className="section-title-row">
-        <h3>{i18n.details.requestPayload}</h3>
+        <h3>{i18n.details.postBody}</h3>
         <button
           type="button"
           className="text-button section-action"
@@ -855,9 +877,10 @@ function PayloadEditor(props: {
       ) : null}
       <EditableCodeEditor
         value={props.body}
-        placeholder={i18n.details.editRequestPayload}
+        placeholder={i18n.details.editPostBody}
         onChange={props.onBodyChange}
       />
+      </section>
     </div>
   );
 }
@@ -942,18 +965,58 @@ function EditableCodeEditor(props: {
   );
 }
 
+function EditableQueryParamList(props: {
+  params: HeaderPair[];
+  onChange: (params: HeaderPair[]) => void;
+}) {
+  return (
+    <EditablePairList
+      pairs={props.params}
+      onChange={props.onChange}
+      addLabel={i18n.details.addQueryParam}
+      defaultName="param"
+      editLabel={i18n.details.editQueryParam}
+      removeLabel={i18n.details.removeQueryParam}
+    />
+  );
+}
+
 function EditableHeaderList(props: {
   headers: HeaderPair[];
   onChange: (headers: HeaderPair[]) => void;
+}) {
+  return (
+    <EditablePairList
+      pairs={props.headers}
+      onChange={props.onChange}
+      addLabel={i18n.details.addHeader}
+      defaultName="x-header"
+      editLabel={i18n.details.editHeader}
+      removeLabel={i18n.details.removeHeader}
+      isReadonly={(header) => isProtectedRequestHeader(header.name)}
+      readonlyLabel={i18n.details.readonly}
+    />
+  );
+}
+
+function EditablePairList(props: {
+  pairs: HeaderPair[];
+  onChange: (pairs: HeaderPair[]) => void;
+  addLabel: string;
+  defaultName: string;
+  editLabel: (name: string) => string;
+  removeLabel: (name: string) => string;
+  isReadonly?: (pair: HeaderPair) => boolean;
+  readonlyLabel?: string;
 }) {
   const [editingIndex, setEditingIndex] = useState<number>();
   const [draftName, setDraftName] = useState("");
   const [draftValue, setDraftValue] = useState("");
 
-  function beginEdit(index: number, header: HeaderPair) {
+  function beginEdit(index: number, pair: HeaderPair) {
     setEditingIndex(index);
-    setDraftName(header.name);
-    setDraftValue(header.value);
+    setDraftName(pair.name);
+    setDraftValue(pair.value);
   }
 
   function commitEdit() {
@@ -963,10 +1026,10 @@ function EditableHeaderList(props: {
     }
 
     props.onChange(
-      props.headers.map((header, index) =>
+      props.pairs.map((pair, index) =>
         index === editingIndex
           ? { name: draftName.trim(), value: draftValue }
-          : header
+          : pair
       )
     );
     setEditingIndex(undefined);
@@ -974,10 +1037,10 @@ function EditableHeaderList(props: {
 
   return (
     <div className="header-list editable-header-list">
-      {props.headers.map((header, index) => (
-        <HeaderRow
-          key={`${header.name}-${index}`}
-          header={header}
+      {props.pairs.map((pair, index) => (
+        <EditablePairRow
+          key={`${pair.name}-${index}`}
+          pair={pair}
           index={index}
           editingIndex={editingIndex}
           draftName={draftName}
@@ -987,50 +1050,58 @@ function EditableHeaderList(props: {
           onDraftNameChange={setDraftName}
           onDraftValueChange={setDraftValue}
           onCancelEdit={() => setEditingIndex(undefined)}
-          onRemove={(removeIndex) => props.onChange(removeHeaderAt(props.headers, removeIndex))}
+          onRemove={(removeIndex) => props.onChange(removeHeaderAt(props.pairs, removeIndex))}
+          isReadonly={props.isReadonly}
+          readonlyLabel={props.readonlyLabel}
+          editLabel={props.editLabel}
+          removeLabel={props.removeLabel}
         />
       ))}
       <button
         type="button"
         className="add-header-button"
         onClick={() => {
-          const nextHeader = { name: "x-header", value: "" };
-          props.onChange([...props.headers, nextHeader]);
-          setEditingIndex(props.headers.length);
-          setDraftName(nextHeader.name);
-          setDraftValue(nextHeader.value);
+          const nextPair = { name: props.defaultName, value: "" };
+          props.onChange([...props.pairs, nextPair]);
+          setEditingIndex(props.pairs.length);
+          setDraftName(nextPair.name);
+          setDraftValue(nextPair.value);
         }}
       >
-        {i18n.details.addHeader}
+        {props.addLabel}
       </button>
     </div>
   );
 }
 
-function HeaderRow(props: {
-  header: HeaderPair;
+function EditablePairRow(props: {
+  pair: HeaderPair;
   index: number;
   editingIndex?: number;
   draftName: string;
   draftValue: string;
-  onBeginEdit: (index: number, header: HeaderPair) => void;
+  onBeginEdit: (index: number, pair: HeaderPair) => void;
   onCommitEdit: () => void;
   onDraftNameChange: (value: string) => void;
   onDraftValueChange: (value: string) => void;
   onCancelEdit: () => void;
   onRemove: (index: number) => void;
+  isReadonly?: (pair: HeaderPair) => boolean;
+  readonlyLabel?: string;
+  editLabel: (name: string) => string;
+  removeLabel: (name: string) => string;
 }) {
-  const isProtected = isProtectedRequestHeader(props.header.name);
+  const isReadonly = props.isReadonly?.(props.pair) ?? false;
   const isEditing = props.editingIndex === props.index;
 
   return (
     <div
-      className={`key-value header-row ${isProtected ? "is-protected" : ""}`}
+      className={`key-value header-row ${isReadonly ? "is-protected" : ""}`}
       onDoubleClick={() => {
-        if (!isProtected) props.onBeginEdit(props.index, props.header);
+        if (!isReadonly) props.onBeginEdit(props.index, props.pair);
       }}
     >
-      {isEditing && !isProtected ? (
+      {isEditing && !isReadonly ? (
         <>
           <input
             className="header-name-input"
@@ -1060,21 +1131,21 @@ function HeaderRow(props: {
       ) : (
         <>
           <span>
-            {props.header.name}
-            {isProtected ? <em className="readonly-pill">{i18n.details.readonly}</em> : null}
+            {props.pair.name}
+            {isReadonly && props.readonlyLabel ? <em className="readonly-pill">{props.readonlyLabel}</em> : null}
           </span>
-          <strong className="header-value" title={props.header.value}>
-            <span className="header-value-text">{props.header.value}</span>
-            {!isProtected ? (
+          <strong className="header-value" title={props.pair.value}>
+            <span className="header-value-text">{props.pair.value}</span>
+            {!isReadonly ? (
               <span className="header-actions">
-                <button type="button" className="header-row-icon" onClick={() => props.onBeginEdit(props.index, props.header)} aria-label={i18n.details.editHeader(props.header.name)}>
+                <button type="button" className="header-row-icon" onClick={() => props.onBeginEdit(props.index, props.pair)} aria-label={props.editLabel(props.pair.name)}>
                   <EditIcon />
                 </button>
                 <button
                   type="button"
                   className="header-row-icon"
                   onClick={() => props.onRemove(props.index)}
-                  aria-label={i18n.details.removeHeader(props.header.name)}
+                  aria-label={props.removeLabel(props.pair.name)}
                 >
                   <RemoveIcon />
                 </button>
