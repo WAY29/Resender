@@ -8,6 +8,7 @@ import {
   getDefaultPreviewScale,
   getFittedPreviewScale,
   getJsonChildren,
+  getPreviewImageSrc,
   getPreviewModel,
   isJsonComposite
 } from "./preview";
@@ -110,6 +111,26 @@ describe("buildPreviewSrcDoc", () => {
 
   it("builds a data url for base64 image previews", () => {
     expect(buildBase64ImageDataUrl("image/gif", "R0lG\nODlh")).toBe("data:image/gif;base64,R0lGODlh");
+  });
+
+  it("returns a thumbnail src for svg and base64 image previews", () => {
+    expect(getPreviewImageSrc(getPreviewModel(textBody("<svg></svg>", "image/svg+xml")))).toBe(
+      "data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E"
+    );
+    expect(
+      getPreviewImageSrc(
+        getPreviewModel({
+          kind: "text",
+          text: "R0lGODlhAQABAIAAAAUEBA==",
+          mimeType: "image/gif",
+          encoding: "base64"
+        })
+      )
+    ).toBe("data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA==");
+  });
+
+  it("does not return a thumbnail src for non-image previews", () => {
+    expect(getPreviewImageSrc(getPreviewModel(textBody("hello", "text/plain")))).toBeUndefined();
   });
 });
 

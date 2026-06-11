@@ -627,10 +627,16 @@ button {
   line-height: 1;
 }
 
-.request-type-icon svg {
+.request-type-icon svg,
+.request-type-thumbnail {
   display: block;
   width: 16px;
   height: 16px;
+}
+
+.request-type-thumbnail {
+  object-fit: contain;
+  border-radius: 2px;
 }
 
 .resender-mark {

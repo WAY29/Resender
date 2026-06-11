@@ -37,11 +37,11 @@ import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } fro
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import {
   buildPreviewSrcDoc,
-  buildSvgDataUrl,
   describeJsonValue,
   getDefaultPreviewScale,
   getFittedPreviewScale,
   getJsonChildren,
+  getPreviewImageSrc,
   getPreviewModel,
   isJsonComposite,
   type JsonValue
@@ -655,14 +655,16 @@ function InitiatorCell({ record }: { record: NetworkRecord }) {
 
 function RequestTypeIcon({ record }: { record: NetworkRecord }) {
   const icon = getNetworkIconData(record);
+  const thumbnailSrc = icon.iconName === "file-image" ? getPreviewImageSrc(getPreviewModel(record.responseBody)) : undefined;
+
   return (
     <span
       className="request-type-icon"
       title={icon.label}
       aria-label={icon.label}
-      style={{ color: `var(${icon.colorVar})` }}
+      style={thumbnailSrc ? undefined : { color: `var(${icon.colorVar})` }}
     >
-      <NetworkIcon iconName={icon.iconName} />
+      {thumbnailSrc ? <img className="request-type-thumbnail" src={thumbnailSrc} alt="" /> : <NetworkIcon iconName={icon.iconName} />}
     </span>
   );
 }
@@ -1055,10 +1057,7 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 
 function PreviewView({ record }: { record: NetworkRecord }) {
   const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
-  const imageSrc = useMemo(
-    () => (preview.kind === "svg" ? buildSvgDataUrl(preview.text) : preview.kind === "image" ? preview.dataUrl : undefined),
-    [preview]
-  );
+  const imageSrc = useMemo(() => getPreviewImageSrc(preview), [preview]);
   const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(record.responseBody.mimeType));
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>();
   const [imageViewportHeight, setImageViewportHeight] = useState<number>();

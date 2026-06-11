@@ -81,6 +81,18 @@ export function buildBase64ImageDataUrl(mimeType: string, base64: string): strin
   return `data:${mimeType};base64,${base64.replace(/\s/g, "")}`;
 }
 
+export function getPreviewImageSrc(preview: PreviewModel): string | undefined {
+  if (preview.kind === "svg") {
+    return buildSvgDataUrl(preview.text);
+  }
+
+  if (preview.kind === "image") {
+    return preview.dataUrl;
+  }
+
+  return undefined;
+}
+
 export function getDefaultPreviewScale(mimeType?: string): number {
   return simplifyContentType(mimeType) === "image/svg+xml" ? 0.75 : 1;
 }
