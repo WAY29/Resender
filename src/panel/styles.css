@@ -967,6 +967,143 @@ button {
   color: var(--warning-text);
 }
 
+.preview-view,
+.body-view {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-frame,
+.preview-text,
+.json-tree {
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+}
+
+.preview-json-view {
+  display: grid;
+  gap: 10px;
+}
+
+.json-tree-actions {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.preview-frame {
+  width: 100%;
+  height: min(70vh, 680px);
+}
+
+.preview-text {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: var(--code-text);
+  font-family: var(--font-code);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.json-tree {
+  padding: 8px;
+  overflow: auto;
+}
+
+.json-node-group {
+  display: grid;
+  gap: 2px;
+}
+
+.json-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px 8px 2px calc(8px + var(--json-depth, 0) * 16px);
+  color: var(--code-text);
+  font-family: var(--font-code);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.json-node-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.json-node-toggle:hover {
+  background: var(--panel-raised);
+}
+
+.json-chevron {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
+
+.json-chevron svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.json-chevron.is-expanded {
+  transform: rotate(0deg);
+}
+
+.json-node-toggle .json-chevron:not(.is-expanded) {
+  transform: rotate(-90deg);
+}
+
+.json-children {
+  display: grid;
+}
+
+.json-key,
+.json-separator,
+.json-summary,
+.json-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.json-key {
+  color: var(--token-property);
+}
+
+.json-separator,
+.json-summary {
+  color: var(--muted);
+}
+
+.json-value-string {
+  color: var(--token-string);
+}
+
+.json-value-number {
+  color: var(--token-number);
+}
+
+.json-value-boolean,
+.json-value-null {
+  color: var(--token-keyword);
+}
+
 .edit-grid {
   display: grid;
   grid-template-columns: 1fr 130px 130px;

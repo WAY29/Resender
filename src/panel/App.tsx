@@ -36,6 +36,14 @@ import {
 import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import {
+  buildPreviewSrcDoc,
+  describeJsonValue,
+  getJsonChildren,
+  getPreviewModel,
+  isJsonComposite,
+  type JsonValue
+} from "./preview";
+import {
   ensureContentTypeHeader,
   removeAutoAddedEmptyContentType,
   syncAutoAddedContentTypeIndex
@@ -56,7 +64,7 @@ const defaultFilter: FilterState = {
   type: "all"
 };
 
-type DetailTab = "headers" | "payload" | "response";
+type DetailTab = "headers" | "payload" | "preview" | "response";
 
 const filterTypes = getFilterTypes();
 const requestColumns = getRequestColumns();
@@ -808,6 +816,7 @@ function RequestDetails(props: {
           {[
             ["headers", i18n.details.headers],
             ["payload", i18n.details.payload],
+            ["preview", i18n.details.preview],
             ["response", i18n.details.response]
           ].map(([id, label]) => (
             <button
@@ -864,6 +873,7 @@ function RequestDetails(props: {
             onBodyChange={setBody}
           />
         ) : null}
+        {props.activeTab === "preview" ? <PreviewView record={props.record} /> : null}
         {props.activeTab === "response" ? <BodyView title={i18n.details.response} body={props.record.responseBody} /> : null}
       </div>
     </aside>
@@ -1034,12 +1044,180 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
       ) : body.kind === "empty" ? (
         <p className="muted">{i18n.details.noBody}</p>
       ) : (
-        <div className="body-unavailable">
-          <strong>{body.kind}</strong>
-          <span>{translateReason(body.reason) ?? i18n.details.bodyUnavailable}</span>
-          {body.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(body.sizeBytes)}</span> : null}
-        </div>
+        <UnavailableBodyView body={body} fallbackMessage={i18n.details.bodyUnavailable} />
       )}
+    </div>
+  );
+}
+
+function PreviewView({ record }: { record: NetworkRecord }) {
+  const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
+
+  return (
+    <div className="preview-view">
+      <h3>{i18n.details.preview}</h3>
+      {preview.kind === "html" ? (
+        <iframe
+          className="preview-frame"
+          sandbox="allow-forms allow-same-origin"
+          srcDoc={buildPreviewSrcDoc(preview.text, record.url)}
+          title={i18n.details.preview}
+        />
+      ) : null}
+      {preview.kind === "json" ? <JsonPreviewTree value={preview.value} /> : null}
+      {preview.kind === "text" ? <TextPreview text={preview.text} mimeType={preview.mimeType} /> : null}
+      {preview.kind === "empty" ? <p className="muted">{i18n.details.noBody}</p> : null}
+      {preview.kind === "unavailable" ? (
+        <UnavailableBodyView
+          body={{
+            kind: preview.bodyKind,
+            reason: preview.reason,
+            sizeBytes: preview.sizeBytes
+          }}
+          fallbackMessage={i18n.details.previewNotSupported}
+          extraMessage={i18n.details.previewNotSupported}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function TextPreview({ text, mimeType }: { text: string; mimeType?: string }) {
+  const [displayText, setDisplayText] = useState(() => text);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setDisplayText(text);
+    void formatCodeTextWithPrettier(text, mimeType).then((formatted) => {
+      if (!cancelled) {
+        setDisplayText(formatted);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mimeType, text]);
+
+  return <pre className="preview-text">{displayText}</pre>;
+}
+
+function JsonPreviewTree({ value }: { value: JsonValue }) {
+  const composite = isJsonComposite(value);
+  const [syncState, setSyncState] = useState<{ expanded: boolean; version: number }>({
+    expanded: true,
+    version: 0
+  });
+
+  return (
+    <div className="preview-json-view">
+      {composite ? (
+        <div className="section-title-row json-tree-actions">
+          <button
+            type="button"
+            className="text-button section-action"
+            onClick={() => setSyncState((current) => ({ expanded: true, version: current.version + 1 }))}
+          >
+            {i18n.details.expandAll}
+          </button>
+          <button
+            type="button"
+            className="text-button section-action"
+            onClick={() => setSyncState((current) => ({ expanded: false, version: current.version + 1 }))}
+          >
+            {i18n.details.collapseAll}
+          </button>
+        </div>
+      ) : null}
+      <div className="json-tree" role="tree">
+        <JsonPreviewNode
+          nodeKey={Array.isArray(value) ? "[]" : "{}"}
+          value={value}
+          depth={0}
+          defaultExpanded
+          syncState={syncState}
+        />
+      </div>
+    </div>
+  );
+}
+
+function JsonPreviewNode(props: {
+  nodeKey: string;
+  value: JsonValue;
+  depth: number;
+  defaultExpanded?: boolean;
+  syncState: { expanded: boolean; version: number };
+}) {
+  const composite = isJsonComposite(props.value);
+  const [expanded, setExpanded] = useState(() => props.defaultExpanded ?? props.depth < 1);
+
+  useEffect(() => {
+    if (!composite) {
+      return;
+    }
+
+    setExpanded(props.syncState.expanded);
+  }, [composite, props.syncState]);
+
+  if (!composite) {
+    return (
+      <div className="json-node json-leaf" style={{ "--json-depth": props.depth } as CSSProperties}>
+        <span className="json-key">{props.nodeKey}</span>
+        <span className="json-separator">:</span>
+        <span className={`json-value json-value-${typeof props.value === "string" ? "string" : props.value === null ? "null" : typeof props.value}`}>
+          {describeJsonValue(props.value)}
+        </span>
+      </div>
+    );
+  }
+
+  const children = getJsonChildren(props.value);
+
+  return (
+    <div className="json-node-group" style={{ "--json-depth": props.depth } as CSSProperties}>
+      <button
+        type="button"
+        className="json-node json-node-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        <span className={`json-chevron ${expanded ? "is-expanded" : ""}`} aria-hidden="true">
+          <ChevronDownIcon />
+        </span>
+        <span className="json-key">{props.nodeKey}</span>
+        <span className="json-separator">:</span>
+        <span className="json-summary">{describeJsonValue(props.value)}</span>
+      </button>
+      {expanded ? (
+        <div className="json-children" role="group">
+          {children.map((child) => (
+            <JsonPreviewNode
+              key={child.key}
+              nodeKey={child.key}
+              value={child.value}
+              depth={props.depth + 1}
+              syncState={props.syncState}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function UnavailableBodyView(props: {
+  body: Pick<BodyCapture, "kind" | "reason" | "sizeBytes">;
+  fallbackMessage: string;
+  extraMessage?: string;
+}) {
+  return (
+    <div className="body-unavailable">
+      <strong>{props.body.kind}</strong>
+      <span>{translateReason(props.body.reason) ?? props.fallbackMessage}</span>
+      {props.extraMessage ? <span>{props.extraMessage}</span> : null}
+      {props.body.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(props.body.sizeBytes)}</span> : null}
     </div>
   );
 }
