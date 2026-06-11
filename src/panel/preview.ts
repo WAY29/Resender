@@ -2,6 +2,7 @@ import type { BodyCapture } from "../types";
 
 export type PreviewKind =
   | "empty"
+  | "image"
   | "svg"
   | "html"
   | "json"
@@ -10,6 +11,7 @@ export type PreviewKind =
 
 export type PreviewModel =
   | { kind: "empty" }
+  | { kind: "image"; dataUrl: string; mimeType: string }
   | { kind: "svg"; text: string; mimeType?: string }
   | { kind: "html"; text: string; mimeType?: string }
   | { kind: "json"; value: JsonValue; text: string; mimeType?: string }
@@ -47,6 +49,10 @@ export function getPreviewModel(body: BodyCapture): PreviewModel {
     return { kind: "svg", text, mimeType };
   }
 
+  if (isHarBase64ImagePreview(contentType, body.encoding, text)) {
+    return { kind: "image", dataUrl: buildBase64ImageDataUrl(contentType, text), mimeType: contentType };
+  }
+
   if (isHtmlPreviewMime(contentType)) {
     return { kind: "html", text, mimeType };
   }
@@ -69,6 +75,10 @@ export function buildPreviewSrcDoc(source: string, baseUrl: string): string {
 
 export function buildSvgDataUrl(source: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+}
+
+export function buildBase64ImageDataUrl(mimeType: string, base64: string): string {
+  return `data:${mimeType};base64,${base64.replace(/\s/g, "")}`;
 }
 
 export function getDefaultPreviewScale(mimeType?: string): number {
@@ -134,6 +144,10 @@ function looksLikeJson(text: string): boolean {
 
 function isHtmlPreviewMime(contentType: string): boolean {
   return contentType === "text/html";
+}
+
+function isHarBase64ImagePreview(contentType: string, encoding: string | undefined, text: string): boolean {
+  return contentType.startsWith("image/") && contentType !== "image/svg+xml" && encoding === "base64" && text.trim().length > 0;
 }
 
 function simplifyContentType(mimeType?: string): string {

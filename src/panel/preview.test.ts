@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BodyCapture } from "../types";
 import {
+  buildBase64ImageDataUrl,
   buildPreviewSrcDoc,
   buildSvgDataUrl,
   describeJsonValue,
@@ -28,6 +29,35 @@ describe("getPreviewModel", () => {
       kind: "svg",
       text: "<svg viewBox=\"0 0 10 10\"></svg>",
       mimeType: "image/svg+xml"
+    });
+  });
+
+  it("classifies har base64 gif bodies for image preview", () => {
+    expect(
+      getPreviewModel({
+        kind: "text",
+        text: "R0lGODlhAQABAIAAAAUEBA==",
+        mimeType: "image/gif",
+        encoding: "base64"
+      })
+    ).toEqual({
+      kind: "image",
+      dataUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA==",
+      mimeType: "image/gif"
+    });
+  });
+
+  it("does not preview non-base64 image bodies", () => {
+    expect(
+      getPreviewModel({
+        kind: "text",
+        text: "not-base64-image",
+        mimeType: "image/png"
+      })
+    ).toEqual({
+      kind: "text",
+      text: "not-base64-image",
+      mimeType: "image/png"
     });
   });
 
@@ -75,6 +105,10 @@ describe("buildPreviewSrcDoc", () => {
 
   it("builds a data url for svg previews", () => {
     expect(buildSvgDataUrl("<svg></svg>")).toBe("data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E");
+  });
+
+  it("builds a data url for base64 image previews", () => {
+    expect(buildBase64ImageDataUrl("image/gif", "R0lG\nODlh")).toBe("data:image/gif;base64,R0lGODlh");
   });
 });
 

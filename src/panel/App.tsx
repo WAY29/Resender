@@ -1055,21 +1055,21 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 function PreviewView({ record }: { record: NetworkRecord }) {
   const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
   const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(record.responseBody.mimeType));
-  const [svgNaturalSize, setSvgNaturalSize] = useState<{ width: number; height: number }>();
+  const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>();
 
   useEffect(() => {
     setPreviewScale(getDefaultPreviewScale(record.responseBody.mimeType));
   }, [record.id, record.responseBody.mimeType]);
 
   useEffect(() => {
-    setSvgNaturalSize(undefined);
-  }, [record.id, preview.kind === "svg" ? preview.text : undefined]);
+    setImageNaturalSize(undefined);
+  }, [record.id, preview.kind === "svg" ? preview.text : preview.kind === "image" ? preview.dataUrl : undefined]);
 
   return (
     <div className="preview-view">
       <div className="section-title-row preview-header-row">
         <h3>Preview</h3>
-        {preview.kind === "svg" ? (
+        {preview.kind === "svg" || preview.kind === "image" ? (
           <>
             <button
               type="button"
@@ -1092,19 +1092,19 @@ function PreviewView({ record }: { record: NetworkRecord }) {
           </>
         ) : null}
       </div>
-      {preview.kind === "svg" ? (
+      {preview.kind === "svg" || preview.kind === "image" ? (
         <div className="preview-image-scroll">
           <div className="preview-image-shell">
             <img
               className="preview-image"
-              style={svgNaturalSize ? { width: `${svgNaturalSize.width * previewScale}px` } : undefined}
-              src={buildSvgDataUrl(preview.text)}
+              style={imageNaturalSize ? { width: `${imageNaturalSize.width * previewScale}px` } : undefined}
+              src={preview.kind === "svg" ? buildSvgDataUrl(preview.text) : preview.dataUrl}
               alt="Preview"
               onLoad={(event) => {
                 const nextWidth = event.currentTarget.naturalWidth;
                 const nextHeight = event.currentTarget.naturalHeight;
                 if (nextWidth > 0 && nextHeight > 0) {
-                  setSvgNaturalSize({ width: nextWidth, height: nextHeight });
+                  setImageNaturalSize({ width: nextWidth, height: nextHeight });
                 }
               }}
             />
