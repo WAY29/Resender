@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  findHeaderIndex,
   isForbiddenRequestHeader,
+  isContentTypeHeader,
   isProtectedRequestHeader,
   parseHeaderBlock,
   removeHeaderAt,
@@ -46,6 +48,18 @@ describe("header row editing", () => {
       )
     ).toEqual([{ name: "B", value: "2" }]);
   });
+
+  it("finds headers by name ignoring case", () => {
+    expect(
+      findHeaderIndex(
+        [
+          { name: "Authorization", value: "Bearer" },
+          { name: "content-type", value: "application/json" }
+        ],
+        "Content-Type"
+      )
+    ).toBe(1);
+  });
 });
 
 describe("forbidden request headers", () => {
@@ -58,6 +72,12 @@ describe("forbidden request headers", () => {
   it("allows application controlled headers", () => {
     expect(isForbiddenRequestHeader("Authorization")).toBe(false);
     expect(isForbiddenRequestHeader("X-Request-Id")).toBe(false);
+  });
+
+  it("detects Content-Type headers ignoring case and spaces", () => {
+    expect(isContentTypeHeader("Content-Type")).toBe(true);
+    expect(isContentTypeHeader(" content-type ")).toBe(true);
+    expect(isContentTypeHeader("X-Content-Type")).toBe(false);
   });
 
   it("protects only pseudo headers", () => {

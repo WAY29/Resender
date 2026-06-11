@@ -967,6 +967,10 @@ button {
   letter-spacing: 0.02em;
 }
 
+.edit-grid label.method-field {
+  align-content: start;
+}
+
 .edit-grid input,
 .edit-grid select,
 .editable-block,
@@ -1138,6 +1142,79 @@ button {
   flex: 1;
 }
 
+.content-type-editor {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.content-type-editor input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 28px;
+}
+
+.content-type-trigger {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 24px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0 3px 3px 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.content-type-trigger:hover {
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.content-type-trigger svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.content-type-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: grid;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--popover-bg);
+  box-shadow: var(--popover-shadow);
+}
+
+.content-type-menu button {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.content-type-menu button:hover,
+.content-type-menu button.is-selected {
+  background: var(--panel-raised);
+}
+
 .header-row-button {
   height: 24px;
   padding: 0 8px;
@@ -1171,6 +1248,20 @@ button {
   padding: 0 8px;
 }
 
+.inline-confirm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.inline-confirm-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .primary-action {
   justify-self: start;
   height: 30px;
@@ -1192,6 +1283,11 @@ button {
 .primary-action.detail-send {
   height: 24px;
   margin-right: 8px;
+}
+
+.primary-action.inline-confirm-button {
+  height: 24px;
+  padding: 0 10px;
 }
 
 @media (max-width: 1080px) {

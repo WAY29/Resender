@@ -61,6 +61,10 @@ export function removeHeaderAt(headers: HeaderPair[], index: number): HeaderPair
   return headers.filter((_, candidateIndex) => candidateIndex !== index);
 }
 
+export function isContentTypeHeader(name: string): boolean {
+  return name.trim().toLowerCase() === "content-type";
+}
+
 export function isForbiddenRequestHeader(name: string): boolean {
   const lower = name.trim().toLowerCase();
   return (
@@ -102,4 +106,9 @@ export function headersToRecord(headers: HeaderPair[]): Record<string, string> {
 export function findHeader(headers: HeaderPair[], name: string): string | undefined {
   const lower = name.toLowerCase();
   return headers.find((header) => header.name.toLowerCase() === lower)?.value;
+}
+
+export function findHeaderIndex(headers: HeaderPair[], name: string): number {
+  const lower = name.toLowerCase();
+  return headers.findIndex((header) => header.name.toLowerCase() === lower);
 }

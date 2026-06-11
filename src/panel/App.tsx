@@ -27,12 +27,18 @@ import {
   normaliseResendResult
 } from "./records";
 import {
+  isContentTypeHeader,
   isProtectedRequestHeader,
   removeHeaderAt,
   splitEditableHeaders
 } from "./headers";
 import { formatCodeText, tokenizeCode } from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
+import {
+  ensureContentTypeHeader,
+  removeAutoAddedEmptyContentType,
+  syncAutoAddedContentTypeIndex
+} from "./methodTransitions";
 import {
   normaliseUrlQueryEncoding,
   parseQueryParams,
@@ -53,6 +59,12 @@ type DetailTab = "headers" | "payload" | "response";
 
 const filterTypes = getFilterTypes();
 const requestColumns = getRequestColumns();
+const commonContentTypeValues = [
+  "application/json",
+  "application/x-www-form-urlencoded",
+  "text/plain",
+  "multipart/form-data"
+] as const;
 
 const defaultColumnWidths = requestColumns.reduce<Record<SortColumn, number>>((widths, column) => {
   widths[column.id] = column.defaultWidth;
@@ -666,6 +678,10 @@ function RequestDetails(props: {
   const [body, setBody] = useState("");
   const [credentials, setCredentials] = useState<RequestCredentials>("same-origin");
   const [sending, setSending] = useState(false);
+  const [pendingMethod, setPendingMethod] = useState<string>();
+  const [autoAddedContentTypeIndex, setAutoAddedContentTypeIndex] = useState<number>();
+  const [focusHeaderIndex, setFocusHeaderIndex] = useState<number>();
+  const [focusHeaderValue, setFocusHeaderValue] = useState(false);
 
   useEffect(() => {
     setMethod(props.record.method);
@@ -673,10 +689,79 @@ function RequestDetails(props: {
     setRequestHeaders(props.record.requestHeaders);
     setBody(props.record.requestBody.text ?? "");
     setCredentials(props.record.credentials ?? "same-origin");
+    setPendingMethod(undefined);
+    setAutoAddedContentTypeIndex(undefined);
+    setFocusHeaderIndex(undefined);
+    setFocusHeaderValue(false);
   }, [props.record]);
 
   const disabledReason = translateReason(props.record.unsupportedReason);
   const queryParams = useMemo(() => parseQueryParams(url), [url]);
+
+  function beginHeaderValueFocus(index: number) {
+    setFocusHeaderIndex(index);
+    setFocusHeaderValue(true);
+  }
+
+  function handleRequestHeadersChange(nextHeaders: HeaderPair[]) {
+    setAutoAddedContentTypeIndex((currentIndex) =>
+      syncAutoAddedContentTypeIndex(requestHeaders, nextHeaders, currentIndex)
+    );
+    setRequestHeaders(nextHeaders);
+  }
+
+  function commitMethodChange(nextMethodRaw: string) {
+    const nextMethod = nextMethodRaw.toUpperCase();
+    const currentMethod = method.toUpperCase();
+
+    if (currentMethod === nextMethod) {
+      return;
+    }
+
+    if (currentMethod === "POST" && nextMethod === "GET") {
+      if (body.length > 0) {
+        setPendingMethod(nextMethod);
+        return;
+      }
+
+      setMethod(nextMethod);
+      const nextHeaders = removeAutoAddedEmptyContentType(requestHeaders, autoAddedContentTypeIndex);
+      setRequestHeaders(nextHeaders);
+      setAutoAddedContentTypeIndex(undefined);
+      return;
+    }
+
+    if (currentMethod === "GET" && nextMethod === "POST") {
+      setMethod(nextMethod);
+      const { headers, addedIndex } = ensureContentTypeHeader(requestHeaders);
+      setRequestHeaders(headers);
+      if (addedIndex !== undefined) {
+        setAutoAddedContentTypeIndex(addedIndex);
+        beginHeaderValueFocus(addedIndex);
+      } else {
+        setAutoAddedContentTypeIndex(undefined);
+      }
+      return;
+    }
+
+    setMethod(nextMethod);
+  }
+
+  function confirmSwitchToGet() {
+    if (!pendingMethod) {
+      return;
+    }
+
+    setMethod(pendingMethod);
+    setBody("");
+    setRequestHeaders(removeAutoAddedEmptyContentType(requestHeaders, autoAddedContentTypeIndex));
+    setAutoAddedContentTypeIndex(undefined);
+    setPendingMethod(undefined);
+  }
+
+  function cancelPendingMethodChange() {
+    setPendingMethod(undefined);
+  }
 
   async function send() {
     if (disabledReason) {
@@ -749,13 +834,22 @@ function RequestDetails(props: {
           <HeadersView
             record={props.record}
             method={method}
+            pendingMethod={pendingMethod}
             url={url}
             credentials={credentials}
             requestHeaders={requestHeaders}
-            onMethodChange={setMethod}
+            focusHeaderIndex={focusHeaderIndex}
+            focusHeaderValue={focusHeaderValue}
+            onMethodChange={commitMethodChange}
             onUrlChange={setUrl}
             onCredentialsChange={setCredentials}
-            onRequestHeadersChange={setRequestHeaders}
+            onRequestHeadersChange={handleRequestHeadersChange}
+            onClearHeaderFocus={() => {
+              setFocusHeaderIndex(undefined);
+              setFocusHeaderValue(false);
+            }}
+            onConfirmMethodChange={confirmSwitchToGet}
+            onCancelMethodChange={cancelPendingMethodChange}
           />
         ) : null}
         {props.activeTab === "payload" ? (
@@ -776,13 +870,19 @@ function RequestDetails(props: {
 function HeadersView(props: {
   record: NetworkRecord;
   method: string;
+  pendingMethod?: string;
   url: string;
   credentials: RequestCredentials;
   requestHeaders: HeaderPair[];
+  focusHeaderIndex?: number;
+  focusHeaderValue: boolean;
   onMethodChange: (method: string) => void;
   onUrlChange: (url: string) => void;
   onCredentialsChange: (credentials: RequestCredentials) => void;
   onRequestHeadersChange: (headers: HeaderPair[]) => void;
+  onClearHeaderFocus: () => void;
+  onConfirmMethodChange: () => void;
+  onCancelMethodChange: () => void;
 }) {
   return (
     <div className="headers-view">
@@ -792,7 +892,7 @@ function HeadersView(props: {
             {i18n.details.requestUrl}
             <input value={props.url} onChange={(event) => props.onUrlChange(event.currentTarget.value)} />
           </label>
-          <label>
+          <label className="method-field">
             {i18n.details.requestMethod}
             <select
               value={props.method}
@@ -819,6 +919,15 @@ function HeadersView(props: {
             </select>
           </label>
         </div>
+        {props.pendingMethod === "GET" ? (
+          <InlineConfirmBar
+            message={i18n.details.switchToGetClearsBody}
+            confirmLabel={i18n.details.convert}
+            cancelLabel={i18n.details.cancel}
+            onConfirm={props.onConfirmMethodChange}
+            onCancel={props.onCancelMethodChange}
+          />
+        ) : null}
         <KeyValue name={i18n.details.statusCode} value={`${props.record.status ?? "-"} ${props.record.statusText ?? ""}`} />
         <KeyValue name={i18n.details.resourceType} value={i18n.resourceTypes[props.record.type]} />
         <KeyValue name={i18n.details.frame} value={props.record.frameUrl ?? "-"} />
@@ -827,6 +936,9 @@ function HeadersView(props: {
         <EditableHeaderList
           headers={props.requestHeaders}
           onChange={props.onRequestHeadersChange}
+          focusIndex={props.focusHeaderIndex}
+          focusValue={props.focusHeaderValue}
+          onClearFocus={props.onClearHeaderFocus}
         />
       </DetailSection>
       <DetailSection title={i18n.details.responseHeaders}>
@@ -858,28 +970,28 @@ function PayloadEditor(props: {
         />
       </DetailSection>
       <section className="detail-section">
-      <div className="section-title-row">
-        <h3>{i18n.details.postBody}</h3>
-        <button
-          type="button"
-          className="text-button section-action"
-          onClick={() => props.onBodyChange(formatCodeText(props.body, props.bodyCapture.mimeType))}
-        >
-          {i18n.details.format}
-        </button>
-      </div>
-      {unavailable ? (
-        <div className="body-unavailable">
-          <strong>{props.bodyCapture.kind}</strong>
-          <span>{translateReason(props.bodyCapture.reason) ?? i18n.details.originalPayloadUnavailable}</span>
-          {props.bodyCapture.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(props.bodyCapture.sizeBytes)}</span> : null}
+        <div className="section-title-row">
+          <h3>{i18n.details.requestBody}</h3>
+          <button
+            type="button"
+            className="text-button section-action"
+            onClick={() => props.onBodyChange(formatCodeText(props.body, props.bodyCapture.mimeType))}
+          >
+            {i18n.details.format}
+          </button>
         </div>
-      ) : null}
-      <EditableCodeEditor
-        value={props.body}
-        placeholder={i18n.details.editPostBody}
-        onChange={props.onBodyChange}
-      />
+        {unavailable ? (
+          <div className="body-unavailable">
+            <strong>{props.bodyCapture.kind}</strong>
+            <span>{translateReason(props.bodyCapture.reason) ?? i18n.details.originalPayloadUnavailable}</span>
+            {props.bodyCapture.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(props.bodyCapture.sizeBytes)}</span> : null}
+          </div>
+        ) : null}
+        <EditableCodeEditor
+          value={props.body}
+          placeholder={i18n.details.editRequestBody}
+          onChange={props.onBodyChange}
+        />
       </section>
     </div>
   );
@@ -984,6 +1096,9 @@ function EditableQueryParamList(props: {
 function EditableHeaderList(props: {
   headers: HeaderPair[];
   onChange: (headers: HeaderPair[]) => void;
+  focusIndex?: number;
+  focusValue: boolean;
+  onClearFocus: () => void;
 }) {
   return (
     <EditablePairList
@@ -995,6 +1110,9 @@ function EditableHeaderList(props: {
       removeLabel={i18n.details.removeHeader}
       isReadonly={(header) => isProtectedRequestHeader(header.name)}
       readonlyLabel={i18n.details.readonly}
+      focusIndex={props.focusIndex}
+      focusValue={props.focusValue}
+      onClearFocus={props.onClearFocus}
     />
   );
 }
@@ -1008,10 +1126,29 @@ function EditablePairList(props: {
   removeLabel: (name: string) => string;
   isReadonly?: (pair: HeaderPair) => boolean;
   readonlyLabel?: string;
+  focusIndex?: number;
+  focusValue?: boolean;
+  onClearFocus?: () => void;
 }) {
   const [editingIndex, setEditingIndex] = useState<number>();
   const [draftName, setDraftName] = useState("");
   const [draftValue, setDraftValue] = useState("");
+
+  useEffect(() => {
+    if (props.focusIndex === undefined) {
+      return;
+    }
+
+    const pair = props.pairs[props.focusIndex];
+    if (!pair) {
+      props.onClearFocus?.();
+      return;
+    }
+
+    setEditingIndex(props.focusIndex);
+    setDraftName(pair.name);
+    setDraftValue(pair.value);
+  }, [props.focusIndex, props.onClearFocus, props.pairs]);
 
   function beginEdit(index: number, pair: HeaderPair) {
     setEditingIndex(index);
@@ -1055,6 +1192,9 @@ function EditablePairList(props: {
           readonlyLabel={props.readonlyLabel}
           editLabel={props.editLabel}
           removeLabel={props.removeLabel}
+          autoFocusName={props.focusIndex === index && !props.focusValue}
+          autoFocusValue={props.focusIndex === index && Boolean(props.focusValue)}
+          onAutoFocusHandled={props.onClearFocus}
         />
       ))}
       <button
@@ -1090,9 +1230,18 @@ function EditablePairRow(props: {
   readonlyLabel?: string;
   editLabel: (name: string) => string;
   removeLabel: (name: string) => string;
+  autoFocusName?: boolean;
+  autoFocusValue?: boolean;
+  onAutoFocusHandled?: () => void;
 }) {
   const isReadonly = props.isReadonly?.(props.pair) ?? false;
   const isEditing = props.editingIndex === props.index;
+
+  useEffect(() => {
+    if (isEditing && (props.autoFocusName || props.autoFocusValue)) {
+      props.onAutoFocusHandled?.();
+    }
+  }, [isEditing, props.autoFocusName, props.autoFocusValue, props.onAutoFocusHandled]);
 
   return (
     <div
@@ -1105,6 +1254,7 @@ function EditablePairRow(props: {
         <>
           <input
             className="header-name-input"
+            autoFocus={props.autoFocusName}
             value={props.draftName}
             onChange={(event) => props.onDraftNameChange(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -1113,10 +1263,11 @@ function EditablePairRow(props: {
             }}
           />
           <span className="header-value-edit">
-            <input
-              autoFocus
+            <HeaderValueEditor
+              name={props.draftName}
               value={props.draftValue}
-              onChange={(event) => props.onDraftValueChange(event.currentTarget.value)}
+              autoFocus={props.autoFocusValue || (!props.autoFocusName && !props.autoFocusValue)}
+              onChange={props.onDraftValueChange}
               onBlur={props.onCommitEdit}
               onKeyDown={(event) => {
                 if (event.key === "Enter") props.onCommitEdit();
@@ -1154,6 +1305,127 @@ function EditablePairRow(props: {
           </strong>
         </>
       )}
+    </div>
+  );
+}
+
+function HeaderValueEditor(props: {
+  name: string;
+  value: string;
+  autoFocus: boolean;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
+}) {
+  if (isContentTypeHeader(props.name)) {
+    return (
+      <ContentTypeValueEditor
+        value={props.value}
+        autoFocus={props.autoFocus}
+        onChange={props.onChange}
+        onBlur={props.onBlur}
+        onKeyDown={props.onKeyDown}
+      />
+    );
+  }
+
+  return (
+    <input
+      autoFocus={props.autoFocus}
+      value={props.value}
+      onChange={(event) => props.onChange(event.currentTarget.value)}
+      onBlur={props.onBlur}
+      onKeyDown={props.onKeyDown}
+    />
+  );
+}
+
+function ContentTypeValueEditor(props: {
+  value: string;
+  autoFocus: boolean;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const presetValue = commonContentTypeValues.includes(props.value as (typeof commonContentTypeValues)[number])
+    ? props.value
+    : undefined;
+
+  return (
+    <span className="content-type-editor">
+      <input
+        autoFocus={props.autoFocus}
+        value={props.value}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
+        onBlur={() => {
+          setMenuOpen(false);
+          props.onBlur();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setMenuOpen(true);
+            return;
+          }
+
+          props.onKeyDown(event);
+        }}
+      />
+      <button
+        type="button"
+        className="content-type-trigger"
+        aria-label={i18n.details.commonHeaderValues}
+        aria-haspopup="listbox"
+        aria-expanded={menuOpen}
+        title={presetValue ?? i18n.details.customHeaderValue}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setMenuOpen((current) => !current)}
+      >
+        <ChevronDownIcon />
+      </button>
+      {menuOpen ? (
+        <span className="content-type-menu" role="listbox" aria-label={i18n.details.commonHeaderValues}>
+          {commonContentTypeValues.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="option"
+              aria-selected={presetValue === value}
+              className={presetValue === value ? "is-selected" : ""}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                props.onChange(value);
+                setMenuOpen(false);
+              }}
+            >
+              {value}
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function InlineConfirmBar(props: {
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="inline-confirm-bar warning">
+      <span>{props.message}</span>
+      <span className="inline-confirm-actions">
+        <button type="button" className="header-row-button" onClick={props.onCancel}>
+          {props.cancelLabel}
+        </button>
+        <button type="button" className="primary-action inline-confirm-button" onClick={props.onConfirm}>
+          {props.confirmLabel}
+        </button>
+      </span>
     </div>
   );
 }
@@ -1259,6 +1531,14 @@ function CloseIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m7 7 10 10" />
       <path d="m17 7-10 10" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M2.5 4 6 7.5 9.5 4" />
     </svg>
   );
 }
