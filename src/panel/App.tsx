@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, FocusEvent } from "react";
 import type {
   BodyCapture,
   FilterState,
@@ -1244,6 +1244,19 @@ function EditablePairRow(props: {
   const isReadonly = props.isReadonly?.(props.pair) ?? false;
   const isEditing = props.editingIndex === props.index;
 
+  function handleRowBlur(event: FocusEvent<HTMLDivElement>) {
+    if (!isEditing || isReadonly) {
+      return;
+    }
+
+    const nextFocused = event.relatedTarget;
+    if (nextFocused instanceof Node && event.currentTarget.contains(nextFocused)) {
+      return;
+    }
+
+    props.onCommitEdit();
+  }
+
   useEffect(() => {
     if (isEditing && (props.autoFocusName || props.autoFocusValue)) {
       props.onAutoFocusHandled?.();
@@ -1253,6 +1266,7 @@ function EditablePairRow(props: {
   return (
     <div
       className={`key-value header-row ${isReadonly ? "is-protected" : ""}`}
+      onBlur={handleRowBlur}
       onDoubleClick={() => {
         if (!isReadonly) props.onBeginEdit(props.index, props.pair);
       }}
@@ -1275,7 +1289,6 @@ function EditablePairRow(props: {
               value={props.draftValue}
               autoFocus={props.autoFocusValue || (!props.autoFocusName && !props.autoFocusValue)}
               onChange={props.onDraftValueChange}
-              onBlur={props.onCommitEdit}
               onKeyDown={(event) => {
                 if (event.key === "Enter") props.onCommitEdit();
                 if (event.key === "Escape") props.onCancelEdit();
@@ -1321,7 +1334,6 @@ function HeaderValueEditor(props: {
   value: string;
   autoFocus: boolean;
   onChange: (value: string) => void;
-  onBlur: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }) {
   if (isContentTypeHeader(props.name)) {
@@ -1330,7 +1342,6 @@ function HeaderValueEditor(props: {
         value={props.value}
         autoFocus={props.autoFocus}
         onChange={props.onChange}
-        onBlur={props.onBlur}
         onKeyDown={props.onKeyDown}
       />
     );
@@ -1341,7 +1352,6 @@ function HeaderValueEditor(props: {
       autoFocus={props.autoFocus}
       value={props.value}
       onChange={(event) => props.onChange(event.currentTarget.value)}
-      onBlur={props.onBlur}
       onKeyDown={props.onKeyDown}
     />
   );
@@ -1351,7 +1361,6 @@ function ContentTypeValueEditor(props: {
   value: string;
   autoFocus: boolean;
   onChange: (value: string) => void;
-  onBlur: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1365,10 +1374,7 @@ function ContentTypeValueEditor(props: {
         autoFocus={props.autoFocus}
         value={props.value}
         onChange={(event) => props.onChange(event.currentTarget.value)}
-        onBlur={() => {
-          setMenuOpen(false);
-          props.onBlur();
-        }}
+        onBlur={() => setMenuOpen(false)}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
             event.preventDefault();
