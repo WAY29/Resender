@@ -33,7 +33,7 @@ import {
   removeHeaderAt,
   splitEditableHeaders
 } from "./headers";
-import { formatCodeText, tokenizeCode } from "./codeView";
+import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import {
   ensureContentTypeHeader,
@@ -959,11 +959,25 @@ function PayloadEditor(props: {
   onQueryParamsChange: (queryParams: HeaderPair[]) => void;
   onBodyChange: (body: string) => void;
 }) {
+  const [formatting, setFormatting] = useState(false);
   const unavailable =
     props.bodyCapture.kind !== "text" &&
     props.bodyCapture.kind !== "json" &&
     props.bodyCapture.kind !== "form" &&
     props.bodyCapture.kind !== "empty";
+
+  async function formatBody() {
+    setFormatting(true);
+    try {
+      props.onBodyChange(await formatCodeTextWithPrettier(props.body, props.mimeType));
+    } finally {
+      setFormatting(false);
+    }
+  }
+
+  useEffect(() => {
+    void warmPrettierForMimeType(props.mimeType, props.body);
+  }, [props.body, props.mimeType]);
 
   return (
     <div className="payload-editor">
@@ -979,9 +993,12 @@ function PayloadEditor(props: {
           <button
             type="button"
             className="text-button section-action"
-            onClick={() => props.onBodyChange(formatCodeText(props.body, props.mimeType))}
+            disabled={formatting}
+            onClick={() => {
+              void formatBody();
+            }}
           >
-            {i18n.details.format}
+            {formatting ? i18n.details.formatting : i18n.details.format}
           </button>
         </div>
         {unavailable ? (
@@ -1003,6 +1020,12 @@ function PayloadEditor(props: {
 }
 
 function BodyView({ title, body }: { title: string; body: BodyCapture }) {
+  useEffect(() => {
+    if (body.kind === "text" || body.kind === "json" || body.kind === "form") {
+      void warmPrettierForMimeType(body.mimeType, body.text);
+    }
+  }, [body]);
+
   return (
     <div className="body-view">
       <h3>{title}</h3>
@@ -1022,8 +1045,24 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 }
 
 function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
-  const formattedText = formatCodeText(text, mimeType);
-  const lines = tokenizeCode(formattedText, mimeType);
+  const [displayText, setDisplayText] = useState(() => text);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setDisplayText(text);
+    void formatCodeTextWithPrettier(text, mimeType).then((formatted) => {
+      if (!cancelled) {
+        setDisplayText(formatted);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mimeType, text]);
+
+  const lines = tokenizeCode(displayText, mimeType);
 
   return (
     <div className="code-view">
@@ -1050,6 +1089,10 @@ function EditableCodeEditor(props: {
   onChange: (value: string) => void;
 }) {
   const highlightRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    void warmPrettierForMimeType(props.mimeType, props.value);
+  }, [props.mimeType, props.value]);
+
   const lines = tokenizeCode(props.value, props.mimeType);
 
   return (

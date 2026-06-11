@@ -1,10 +1,7 @@
-export type CodeTokenKind =
-  | "plain"
-  | "property"
-  | "string"
-  | "number"
-  | "boolean"
-  | "null";
+import Prism from "prismjs";
+import "prismjs/components/prism-json.js";
+
+export type CodeTokenKind = string;
 
 export type CodeToken = {
   kind: CodeTokenKind;
@@ -16,7 +13,73 @@ export type CodeLine = {
   tokens: CodeToken[];
 };
 
-export function formatCodeText(text: string, mimeType?: string): string {
+type PrettierModule = {
+  format: (source: string, options: { parser: string; plugins: object[]; tabWidth?: number }) => Promise<string>;
+};
+
+type PrettierConfig = {
+  parser: string;
+  loadPlugins: () => Promise<object[]>;
+};
+
+const prettierPluginLoaders = {
+  babel: () => import("prettier/plugins/babel"),
+  estree: () => import("prettier/plugins/estree"),
+  html: () => import("prettier/plugins/html"),
+  postcss: () => import("prettier/plugins/postcss")
+} as const;
+
+let prettierModulePromise: Promise<PrettierModule> | undefined;
+const prettierPluginPromises = new Map<keyof typeof prettierPluginLoaders, Promise<object>>();
+
+export async function formatCodeTextWithPrettier(text: string, mimeType?: string): Promise<string> {
+  const config = getPrettierConfig(mimeType, text);
+  if (!config) {
+    return formatFallback(text, mimeType);
+  }
+
+  try {
+    const [prettier, plugins] = await Promise.all([loadPrettier(), config.loadPlugins()]);
+    return await prettier.format(text, {
+      parser: config.parser,
+      plugins,
+      tabWidth: 2
+    });
+  } catch {
+    return formatFallback(text, mimeType);
+  }
+}
+
+export function tokenizeCode(text: string, mimeType?: string): CodeLine[] {
+  const language = languageFromMimeType(mimeType, text);
+  if (!language) {
+    return text.split(/\r?\n/).map((line, index) => ({
+      lineNumber: index + 1,
+      tokens: [{ kind: "plain", text: line }]
+    }));
+  }
+
+  const grammar = Prism.languages[language];
+  if (!grammar) {
+    return text.split(/\r?\n/).map((line, index) => ({
+      lineNumber: index + 1,
+      tokens: [{ kind: "plain", text: line }]
+    }));
+  }
+
+  return tokensToLines(Prism.tokenize(text, grammar));
+}
+
+export function warmPrettierForMimeType(mimeType?: string, text?: string): Promise<void> {
+  const config = getPrettierConfig(mimeType, text);
+  if (!config) {
+    return Promise.resolve();
+  }
+
+  return Promise.all([loadPrettier(), config.loadPlugins()]).then(() => undefined);
+}
+
+function formatFallback(text: string, mimeType?: string): string {
   const trimmed = text.trim();
   const contentType = simplifyContentType(mimeType);
   const looksJson =
@@ -35,247 +98,208 @@ export function formatCodeText(text: string, mimeType?: string): string {
   }
 }
 
-export function tokenizeCode(text: string, mimeType?: string): CodeLine[] {
-  const lines = text.split(/\r?\n/);
-
-  return lines.map((line, index) => ({
-    lineNumber: index + 1,
-    tokens: tokenizeLine(line, mimeType)
-  }));
-}
-
-function tokenizeLine(line: string, mimeType?: string): CodeToken[] {
-  const contentType = simplifyContentType(mimeType);
-
-  if (contentType === "application/x-www-form-urlencoded") {
-    return tokenizeFormUrlEncodedLine(line);
-  }
-
-  if (isCssMimeType(contentType)) {
-    return tokenizeCssLine(line);
-  }
-
-  if (isJavaScriptMimeType(contentType)) {
-    return tokenizeJavaScriptLine(line);
-  }
-
-  if (isHtmlMimeType(contentType) || isXmlMimeType(contentType)) {
-    return tokenizeMarkupLine(line);
-  }
-
-  const tokens: CodeToken[] = [];
-  const pattern =
-    /("(?:\\.|[^"\\])*"(?=\s*:))|("(?:\\.|[^"\\])*")|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|\b(true|false)\b|\bnull\b/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(line)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "plain", text: line.slice(cursor, match.index) });
-    }
-
-    const text = match[0];
-    if (match[1]) {
-      tokens.push({ kind: "property", text });
-    } else if (match[2]) {
-      tokens.push({ kind: "string", text });
-    } else if (match[3]) {
-      tokens.push({ kind: "number", text });
-    } else if (match[4]) {
-      tokens.push({ kind: "boolean", text });
-    } else {
-      tokens.push({ kind: "null", text });
-    }
-
-    cursor = match.index + text.length;
-  }
-
-  if (cursor < line.length) {
-    tokens.push({ kind: "plain", text: line.slice(cursor) });
-  }
-
-  return tokens.length > 0 ? tokens : [{ kind: "plain", text: line }];
-}
-
-function tokenizeFormUrlEncodedLine(line: string): CodeToken[] {
-  if (line.length === 0) {
-    return [{ kind: "plain", text: line }];
-  }
-
-  const tokens: CodeToken[] = [];
-  const segments = line.split("&");
-
-  segments.forEach((segment, index) => {
-    if (index > 0) {
-      tokens.push({ kind: "plain", text: "&" });
-    }
-
-    const separatorIndex = segment.indexOf("=");
-    if (separatorIndex === -1) {
-      tokens.push({ kind: "property", text: segment });
-      return;
-    }
-
-    tokens.push({ kind: "property", text: segment.slice(0, separatorIndex) });
-    tokens.push({ kind: "plain", text: "=" });
-    tokens.push({ kind: "string", text: segment.slice(separatorIndex + 1) });
-  });
-
-  return tokens;
-}
-
 function simplifyContentType(mimeType?: string): string {
   return mimeType?.split(";")[0].trim().toLowerCase() ?? "";
 }
 
-function isCssMimeType(mimeType: string): boolean {
-  return mimeType === "text/css";
+function languageFromMimeType(mimeType?: string, text?: string): string | undefined {
+  const contentType = simplifyContentType(mimeType);
+  if (!contentType) {
+    const trimmed = text?.trim() ?? "";
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      return "json";
+    }
+    return undefined;
+  }
+
+  if (contentType === "application/x-www-form-urlencoded") {
+    return undefined;
+  }
+
+  if (contentType.includes("json")) {
+    return "json";
+  }
+
+  if (contentType === "text/css") {
+    return "css";
+  }
+
+  if (
+    contentType === "text/javascript" ||
+    contentType === "application/javascript" ||
+    contentType.includes("ecmascript")
+  ) {
+    return "javascript";
+  }
+
+  if (
+    contentType === "text/html" ||
+    contentType === "application/xml" ||
+    contentType === "text/xml" ||
+    contentType.endsWith("+xml") ||
+    contentType === "image/svg+xml"
+  ) {
+    return "markup";
+  }
+
+  return undefined;
 }
 
-function isJavaScriptMimeType(mimeType: string): boolean {
-  return mimeType === "text/javascript" || mimeType === "application/javascript" || mimeType.includes("ecmascript");
+function tokensToLines(tokens: Array<string | Prism.Token>): CodeLine[] {
+  const lines: CodeLine[] = [{ lineNumber: 1, tokens: [] }];
+  appendPrismTokens(lines, tokens, ["plain"]);
+
+  return lines.map((line) => ({
+    lineNumber: line.lineNumber,
+    tokens: line.tokens.length > 0 ? line.tokens : [{ kind: "plain", text: "" }]
+  }));
 }
 
-function isHtmlMimeType(mimeType: string): boolean {
-  return mimeType === "text/html";
+function appendPrismTokens(
+  lines: CodeLine[],
+  tokens: Array<string | Prism.Token>,
+  typeStack: string[]
+) {
+  tokens.forEach((token) => {
+    if (typeof token === "string") {
+      appendText(lines, token, typeStack);
+      return;
+    }
+
+    const nextTypeStack = [
+      normalizeTokenType(token.type),
+      ...aliasesToKinds(token.alias),
+      ...typeStack
+    ];
+    const content = Array.isArray(token.content) ? token.content : [token.content];
+    appendPrismTokens(lines, content, nextTypeStack);
+  });
 }
 
-function isXmlMimeType(mimeType: string): boolean {
-  return mimeType === "application/xml" || mimeType === "text/xml" || mimeType.endsWith("+xml");
+function appendText(lines: CodeLine[], text: string, typeStack: string[]) {
+  const parts = text.split("\n");
+
+  parts.forEach((part, index) => {
+    if (index > 0) {
+      lines.push({ lineNumber: lines.length + 1, tokens: [] });
+    }
+
+    if (part.length === 0) {
+      return;
+    }
+
+    lines[lines.length - 1].tokens.push({
+      kind: pickDisplayKind(typeStack),
+      text: part
+    });
+  });
 }
 
-function tokenizeCssLine(line: string): CodeToken[] {
-  const tokens: CodeToken[] = [];
-  const pattern = /([a-zA-Z-]+)(?=\s*:)|((?<=:\s*)(?:[a-zA-Z-]+|#[0-9a-fA-F]{3,8}\b))|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(-?\b\d+(?:\.\d+)?(?:[a-zA-Z%]+)?\b)/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(line)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "plain", text: line.slice(cursor, match.index) });
-    }
-
-    if (match[1]) {
-      tokens.push({ kind: "property", text: match[1] });
-    } else if (match[2]) {
-      tokens.push({ kind: "string", text: match[2] });
-    } else if (match[3]) {
-      tokens.push({ kind: "string", text: match[3] });
-    } else {
-      tokens.push({ kind: "number", text: match[4] });
-    }
-
-    cursor = match.index + match[0].length;
+function aliasesToKinds(alias: string | string[] | undefined): string[] {
+  if (!alias) {
+    return [];
   }
 
-  if (cursor < line.length) {
-    tokens.push({ kind: "plain", text: line.slice(cursor) });
-  }
-
-  return tokens.length > 0 ? tokens : [{ kind: "plain", text: line }];
+  return Array.isArray(alias) ? alias.map(normalizeTokenType) : [normalizeTokenType(alias)];
 }
 
-function tokenizeJavaScriptLine(line: string): CodeToken[] {
-  const tokens: CodeToken[] = [];
-  const pattern = /(\b(?:const|let|var|function|return|if|else|for|while|switch|case|break|continue|new|class|extends|import|export|from|async|await|try|catch|finally|throw)\b)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|\b(true|false|null|undefined)\b/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(line)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "plain", text: line.slice(cursor, match.index) });
-    }
-
-    if (match[1]) {
-      tokens.push({ kind: "boolean", text: match[1] });
-    } else if (match[2]) {
-      tokens.push({ kind: "string", text: match[2] });
-    } else if (match[3]) {
-      tokens.push({ kind: "number", text: match[3] });
-    } else if (match[4] === "null") {
-      tokens.push({ kind: "null", text: match[4] });
-    } else {
-      tokens.push({ kind: "boolean", text: match[4] });
-    }
-
-    cursor = match.index + match[0].length;
-  }
-
-  if (cursor < line.length) {
-    tokens.push({ kind: "plain", text: line.slice(cursor) });
-  }
-
-  return tokens.length > 0 ? tokens : [{ kind: "plain", text: line }];
+function normalizeTokenType(kind: string): string {
+  return kind.toLowerCase().replace(/\s+/g, "-");
 }
 
-function tokenizeMarkupLine(line: string): CodeToken[] {
-  const tokens: CodeToken[] = [];
-  const tagPattern = /<\/?[a-zA-Z][^>]*>|>/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
+function pickDisplayKind(kinds: string[]): string {
+  const preferredKinds = [
+    "property",
+    "attr-name",
+    "attr-value",
+    "selector",
+    "string",
+    "number",
+    "color",
+    "function",
+    "keyword",
+    "boolean",
+    "tag",
+    "operator",
+    "punctuation",
+    "plain"
+  ];
 
-  while ((match = tagPattern.exec(line)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "plain", text: line.slice(cursor, match.index) });
+  for (const kind of preferredKinds) {
+    if (kinds.includes(kind)) {
+      return kind;
     }
-
-    tokens.push(...tokenizeMarkupTag(match[0]));
-    cursor = match.index + match[0].length;
   }
 
-  if (cursor < line.length) {
-    tokens.push({ kind: "plain", text: line.slice(cursor) });
-  }
-
-  return tokens.length > 0 ? tokens : [{ kind: "plain", text: line }];
+  return kinds[0] ?? "plain";
 }
 
-function tokenizeMarkupTag(tag: string): CodeToken[] {
-  if (tag === ">") {
-    return [{ kind: "boolean", text: tag }];
+function getPrettierConfig(mimeType?: string, text?: string): PrettierConfig | undefined {
+  const contentType = simplifyContentType(mimeType);
+  const trimmed = text?.trim() ?? "";
+
+  if (contentType.includes("json") || (!contentType && (trimmed.startsWith("{") || trimmed.startsWith("[")))) {
+    return {
+      parser: "json",
+      loadPlugins: () => loadPrettierPlugins(["estree"])
+    };
   }
 
-  if (/^<\/[a-zA-Z][^>]*>$/.test(tag)) {
-    return [{ kind: "boolean", text: tag }];
+  if (
+    contentType === "text/javascript" ||
+    contentType === "application/javascript" ||
+    contentType.includes("ecmascript")
+  ) {
+    return {
+      parser: "babel",
+      loadPlugins: () => loadPrettierPlugins(["babel", "estree"])
+    };
   }
 
-  const closingBracketIndex = tag.endsWith(">") ? tag.length - 1 : tag.length;
-  const tagBody = tag.slice(0, closingBracketIndex);
-  const tagNameMatch = /^<\/?[^\s/>]+/.exec(tagBody);
-
-  if (!tagNameMatch) {
-    return [{ kind: "boolean", text: tag }];
+  if (contentType === "text/css") {
+    return {
+      parser: "css",
+      loadPlugins: () => loadPrettierPlugins(["postcss"])
+    };
   }
 
-  const tokens: CodeToken[] = [{ kind: "boolean", text: tagNameMatch[0] }];
-  const attrs = tagBody.slice(tagNameMatch[0].length);
-  const attrPattern = /(\s+)|([:\w-]+)(\s*=\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"'>/]+)/g;
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = attrPattern.exec(attrs)) !== null) {
-    if (match.index > cursor) {
-      tokens.push({ kind: "plain", text: attrs.slice(cursor, match.index) });
-    }
-
-    if (match[1]) {
-      tokens.push({ kind: "plain", text: match[1] });
-    } else {
-      tokens.push({ kind: "property", text: match[2] });
-      tokens.push({ kind: "plain", text: match[3] });
-      tokens.push({ kind: "string", text: match[4] });
-    }
-
-    cursor = match.index + match[0].length;
+  if (contentType === "text/html" || contentType === "image/svg+xml") {
+    return {
+      parser: "html",
+      loadPlugins: () => loadPrettierPlugins(["html"])
+    };
   }
 
-  if (cursor < attrs.length) {
-    tokens.push({ kind: "plain", text: attrs.slice(cursor) });
+  if (
+    contentType === "application/xml" ||
+    contentType === "text/xml" ||
+    contentType.endsWith("+xml")
+  ) {
+    return {
+      parser: "html",
+      loadPlugins: () => loadPrettierPlugins(["html"])
+    };
   }
 
-  if (tag.endsWith(">")) {
-    tokens.push({ kind: "boolean", text: ">" });
+  return undefined;
+}
+
+function loadPrettier(): Promise<PrettierModule> {
+  prettierModulePromise ??= import("prettier/standalone") as Promise<PrettierModule>;
+  return prettierModulePromise;
+}
+
+function loadPrettierPlugins(pluginNames: Array<keyof typeof prettierPluginLoaders>): Promise<object[]> {
+  return Promise.all(pluginNames.map(loadPrettierPlugin));
+}
+
+function loadPrettierPlugin(pluginName: keyof typeof prettierPluginLoaders): Promise<object> {
+  const existing = prettierPluginPromises.get(pluginName);
+  if (existing) {
+    return existing;
   }
 
-  return tokens;
+  const promise = prettierPluginLoaders[pluginName]().then((module) => module as object);
+  prettierPluginPromises.set(pluginName, promise);
+  return promise;
 }

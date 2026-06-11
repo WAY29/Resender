@@ -16,6 +16,8 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@vitejs/plugin-react": "^4.3.4",
+    "prettier": "^3.8.4",
+    "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "jsdom": "^25.0.1",

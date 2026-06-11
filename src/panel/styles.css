@@ -915,7 +915,17 @@ button {
   color: var(--token-property);
 }
 
+.token-attr-name,
+.token-selector {
+  color: var(--token-property);
+}
+
 .token-string {
+  color: var(--token-string);
+}
+
+.token-attr-value,
+.token-color {
   color: var(--token-string);
 }
 
@@ -923,6 +933,11 @@ button {
   color: var(--token-number);
 }
 
+.token-function,
+.token-tag,
+.token-keyword,
+.token-operator,
+.token-punctuation,
 .token-boolean,
 .token-null {
   color: var(--token-keyword);
