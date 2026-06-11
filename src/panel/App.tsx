@@ -239,7 +239,7 @@ export function App() {
   function exportEnhancedHar() {
     const payload = {
       tool: "Resender",
-      version: "0.1.0",
+      version: "0.2.1",
       exportedAt: new Date().toISOString(),
       bodyLimitBytes,
       records
