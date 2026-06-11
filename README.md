@@ -23,11 +23,10 @@
 2. [Built With](#built-with)
 3. [Getting Started](#getting-started)
 4. [Usage](#usage)
-5. [Roadmap](#roadmap)
-6. [Contributing](#contributing)
-7. [License](#license)
-8. [Contact](#contact)
-9. [Acknowledgments](#acknowledgments)
+5. [Contributing](#contributing)
+6. [License](#license)
+7. [Contact](#contact)
+8. [Acknowledgments](#acknowledgments)
 
 ## About The Project
 
@@ -98,17 +97,6 @@ The production extension is generated in `dist/`. The `dist/` directory is inten
 7. Use import/export to move captured request sets between sessions.
 
 Some browser-controlled headers cannot be replayed because Chrome and Fetch own them. Binary, streaming, oversized, and unsupported request bodies are displayed for context but are not editable yet.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Roadmap
-
-- Improve parity with Chrome DevTools Network rendering.
-- Add broader body editors for form and multipart payloads.
-- Preserve more initiator/source metadata when Chrome exposes it.
-- Package signed store builds after release automation is stable.
-
-See the [open issues](https://github.com/WAY29/Resender/issues) for proposed features and known issues.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
