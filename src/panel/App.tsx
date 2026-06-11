@@ -37,7 +37,9 @@ import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } fro
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import {
   buildPreviewSrcDoc,
+  buildSvgDataUrl,
   describeJsonValue,
+  getDefaultPreviewScale,
   getJsonChildren,
   getPreviewModel,
   isJsonComposite,
@@ -247,7 +249,7 @@ export function App() {
   function exportEnhancedHar() {
     const payload = {
       tool: "Resender",
-      version: "0.2.2",
+      version: "0.2.3",
       exportedAt: new Date().toISOString(),
       bodyLimitBytes,
       records
@@ -816,7 +818,7 @@ function RequestDetails(props: {
           {[
             ["headers", i18n.details.headers],
             ["payload", i18n.details.payload],
-            ["preview", i18n.details.preview],
+            ["preview", "Preview"],
             ["response", i18n.details.response]
           ].map(([id, label]) => (
             <button
@@ -1052,17 +1054,72 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 
 function PreviewView({ record }: { record: NetworkRecord }) {
   const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
+  const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(record.responseBody.mimeType));
+  const [svgNaturalSize, setSvgNaturalSize] = useState<{ width: number; height: number }>();
+
+  useEffect(() => {
+    setPreviewScale(getDefaultPreviewScale(record.responseBody.mimeType));
+  }, [record.id, record.responseBody.mimeType]);
+
+  useEffect(() => {
+    setSvgNaturalSize(undefined);
+  }, [record.id, preview.kind === "svg" ? preview.text : undefined]);
 
   return (
     <div className="preview-view">
-      <h3>{i18n.details.preview}</h3>
+      <div className="section-title-row preview-header-row">
+        <h3>Preview</h3>
+        {preview.kind === "svg" ? (
+          <>
+            <button
+              type="button"
+              className="text-button section-action preview-zoom-button"
+              aria-label="Zoom out"
+              title="Zoom out"
+              onClick={() => setPreviewScale((current) => Math.max(0.25, Number((current - 0.1).toFixed(2))))}
+            >
+              -
+            </button>
+            <button
+              type="button"
+              className="text-button section-action preview-zoom-button"
+              aria-label="Zoom in"
+              title="Zoom in"
+              onClick={() => setPreviewScale((current) => Math.min(3, Number((current + 0.1).toFixed(2))))}
+            >
+              +
+            </button>
+          </>
+        ) : null}
+      </div>
+      {preview.kind === "svg" ? (
+        <div className="preview-image-scroll">
+          <div className="preview-image-shell">
+            <img
+              className="preview-image"
+              style={svgNaturalSize ? { width: `${svgNaturalSize.width * previewScale}px` } : undefined}
+              src={buildSvgDataUrl(preview.text)}
+              alt="Preview"
+              onLoad={(event) => {
+                const nextWidth = event.currentTarget.naturalWidth;
+                const nextHeight = event.currentTarget.naturalHeight;
+                if (nextWidth > 0 && nextHeight > 0) {
+                  setSvgNaturalSize({ width: nextWidth, height: nextHeight });
+                }
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
       {preview.kind === "html" ? (
-        <iframe
-          className="preview-frame"
-          sandbox="allow-forms allow-same-origin"
-          srcDoc={buildPreviewSrcDoc(preview.text, record.url)}
-          title={i18n.details.preview}
-        />
+        <div className="preview-frame-shell">
+          <iframe
+            className="preview-frame"
+            sandbox="allow-forms allow-same-origin"
+            srcDoc={buildPreviewSrcDoc(preview.text, record.url)}
+            title="Preview"
+          />
+        </div>
       ) : null}
       {preview.kind === "json" ? <JsonPreviewTree value={preview.value} /> : null}
       {preview.kind === "text" ? <TextPreview text={preview.text} mimeType={preview.mimeType} /> : null}

@@ -987,6 +987,46 @@ button {
   gap: 10px;
 }
 
+.preview-header-row {
+  margin-bottom: 0;
+}
+
+.preview-frame-shell {
+  min-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+}
+
+.preview-image-scroll {
+  min-height: 220px;
+  overflow: auto;
+}
+
+.preview-image-shell {
+  display: inline-block;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+}
+
+.preview-image {
+  display: block;
+  width: auto;
+  max-width: none;
+  height: auto;
+}
+
+.preview-zoom-button {
+  min-width: 28px;
+  padding: 0;
+  font-family: var(--font-code);
+  font-size: 16px;
+}
+
 .json-tree-actions {
   justify-content: flex-end;
   margin-bottom: 0;
@@ -995,6 +1035,8 @@ button {
 .preview-frame {
   width: 100%;
   height: min(70vh, 680px);
+  border: 0;
+  border-radius: 4px;
 }
 
 .preview-text {

@@ -2,6 +2,7 @@ import type { BodyCapture } from "../types";
 
 export type PreviewKind =
   | "empty"
+  | "svg"
   | "html"
   | "json"
   | "text"
@@ -9,6 +10,7 @@ export type PreviewKind =
 
 export type PreviewModel =
   | { kind: "empty" }
+  | { kind: "svg"; text: string; mimeType?: string }
   | { kind: "html"; text: string; mimeType?: string }
   | { kind: "json"; value: JsonValue; text: string; mimeType?: string }
   | { kind: "text"; text: string; mimeType?: string }
@@ -41,6 +43,10 @@ export function getPreviewModel(body: BodyCapture): PreviewModel {
     }
   }
 
+  if (contentType === "image/svg+xml") {
+    return { kind: "svg", text, mimeType };
+  }
+
   if (isHtmlPreviewMime(contentType)) {
     return { kind: "html", text, mimeType };
   }
@@ -59,6 +65,14 @@ export function buildPreviewSrcDoc(source: string, baseUrl: string): string {
   }
 
   return `<!doctype html><html><head>${baseTag}</head><body>${source}</body></html>`;
+}
+
+export function buildSvgDataUrl(source: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+}
+
+export function getDefaultPreviewScale(mimeType?: string): number {
+  return simplifyContentType(mimeType) === "image/svg+xml" ? 0.75 : 1;
 }
 
 export function describeJsonValue(value: JsonValue): string {
@@ -119,10 +133,7 @@ function looksLikeJson(text: string): boolean {
 }
 
 function isHtmlPreviewMime(contentType: string): boolean {
-  return (
-    contentType === "text/html" ||
-    contentType === "image/svg+xml"
-  );
+  return contentType === "text/html";
 }
 
 function simplifyContentType(mimeType?: string): string {

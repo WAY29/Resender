@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { BodyCapture } from "../types";
 import {
   buildPreviewSrcDoc,
+  buildSvgDataUrl,
   describeJsonValue,
+  getDefaultPreviewScale,
   getJsonChildren,
   getPreviewModel,
   isJsonComposite
@@ -18,6 +20,14 @@ describe("getPreviewModel", () => {
       kind: "html",
       text: "<h1>ok</h1>",
       mimeType: "text/html"
+    });
+  });
+
+  it("classifies svg bodies for image preview", () => {
+    expect(getPreviewModel(textBody("<svg viewBox=\"0 0 10 10\"></svg>", "image/svg+xml"))).toEqual({
+      kind: "svg",
+      text: "<svg viewBox=\"0 0 10 10\"></svg>",
+      mimeType: "image/svg+xml"
     });
   });
 
@@ -61,6 +71,17 @@ describe("buildPreviewSrcDoc", () => {
     expect(buildPreviewSrcDoc("<main>ok</main>", "https://example.test/")).toBe(
       '<!doctype html><html><head><base href="https://example.test/"></head><body><main>ok</main></body></html>'
     );
+  });
+
+  it("builds a data url for svg previews", () => {
+    expect(buildSvgDataUrl("<svg></svg>")).toBe("data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E");
+  });
+});
+
+describe("preview scale helpers", () => {
+  it("uses a smaller default scale for svg previews", () => {
+    expect(getDefaultPreviewScale("image/svg+xml")).toBe(0.75);
+    expect(getDefaultPreviewScale("text/html")).toBe(1);
   });
 });
 
