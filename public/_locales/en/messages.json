@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Resender",
+    "description": "Extension name."
+  },
+  "extensionDescription": {
+    "message": "Edit and resend Fetch/XHR requests from a Chrome DevTools panel.",
+    "description": "Extension description."
+  }
+}

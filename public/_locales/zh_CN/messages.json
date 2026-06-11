@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "Resender",
+    "description": "扩展名称"
+  },
+  "extensionDescription": {
+    "message": "在 Chrome DevTools 面板中编辑并重放 Fetch/XHR 请求",
+    "description": "扩展描述"
+  }
+}
