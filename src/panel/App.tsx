@@ -15,7 +15,7 @@ import {
   openSourceLocation,
   resendFromPage
 } from "./chromeApi";
-import { matchesFilter } from "./filters";
+import { matchesFilter, parseNetworkFilterQuery } from "./filters";
 import { formatBytes, formatDuration } from "./format";
 import {
   applyHarResponseBody,
@@ -57,8 +57,9 @@ import {
   replaceUrlQuery
 } from "./queryParams";
 import { nextSortState, sortRecords, type SortColumn, type SortState } from "./requestSort";
-import { getFilterTypes, getRequestColumns, i18n, translateReason } from "./i18n";
+import { getRequestColumns, i18n, translateReason } from "./i18n";
 import { parseImportedRecords } from "./importExport";
+import { NetworkFilterBar } from "./filterBar";
 import "./styles.css";
 
 const defaultFilter: FilterState = {
@@ -69,7 +70,6 @@ const defaultFilter: FilterState = {
 
 type DetailTab = "headers" | "payload" | "preview" | "response";
 
-const filterTypes = getFilterTypes();
 const requestColumns = getRequestColumns();
 const commonContentTypeValues = [
   "application/json",
@@ -105,9 +105,11 @@ export function App() {
   const bodyLimitBytes = Math.max(1, bodyLimitMb) * 1024 * 1024;
   const selectedRecord = records.find((record) => record.id === selectedId);
 
+  const parsedFilterQuery = useMemo(() => parseNetworkFilterQuery(filter.query), [filter.query]);
+
   const filteredRecords = useMemo(
-    () => sortRecords(records.filter((record) => matchesFilter(record, filter)), sortState),
-    [records, filter, sortState]
+    () => sortRecords(records.filter((record) => matchesFilter(record, filter, parsedFilterQuery)), sortState),
+    [records, filter, parsedFilterQuery, sortState]
   );
 
   const requestGridTemplate = useMemo(
@@ -284,6 +286,7 @@ export function App() {
       <Toolbar
         captureEnabled={captureEnabled}
         filter={filter}
+        records={records}
         preserveLog={preserveLog}
         settingsOpen={settingsOpen}
         bodyLimitMb={bodyLimitMb}
@@ -377,9 +380,10 @@ export function App() {
   );
 }
 
-function Toolbar(props: {
+export function Toolbar(props: {
   captureEnabled: boolean;
   filter: FilterState;
+  records: NetworkRecord[];
   preserveLog: boolean;
   settingsOpen: boolean;
   bodyLimitMb: number;
@@ -458,44 +462,7 @@ function Toolbar(props: {
         ) : null}
       </div>
 
-      <div className="toolbar-row toolbar-filters">
-        <label className="filter-box">
-          <FilterIcon />
-          <input
-            value={props.filter.query}
-            aria-label={i18n.toolbar.filter}
-            placeholder={i18n.toolbar.filterPlaceholder}
-            onChange={(event) =>
-              props.onFilterChange({ ...props.filter, query: event.currentTarget.value })
-            }
-          />
-        </label>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={props.filter.invert}
-            onChange={(event) =>
-              props.onFilterChange({ ...props.filter, invert: event.currentTarget.checked })
-            }
-          />
-          {i18n.toolbar.invert}
-        </label>
-        <button type="button" className="text-button disabled" disabled>
-          {i18n.toolbar.moreFilters}
-        </button>
-        <div className="type-chips">
-          {filterTypes.map((filterType) => (
-            <button
-              key={filterType.id}
-              type="button"
-              className={props.filter.type === filterType.id ? "active" : ""}
-              onClick={() => props.onFilterChange({ ...props.filter, type: filterType.id })}
-            >
-              {filterType.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <NetworkFilterBar filter={props.filter} records={props.records} onFilterChange={props.onFilterChange} />
     </header>
   );
 }
@@ -1983,14 +1950,6 @@ function GearIcon() {
         d="M8.9 17L8.55 14.8C8.25 14.7 7.96 14.58 7.68 14.43C7.4 14.28 7.14 14.12 6.9 13.93L4.85 14.85L3.75 12.95L5.55 11.62C5.52 11.45 5.5 11.28 5.49 11.11C5.47 10.94 5.46 10.77 5.46 10.6C5.46 10.43 5.47 10.26 5.49 10.09C5.5 9.92 5.52 9.75 5.55 9.58L3.75 8.25L4.85 6.35L6.9 7.27C7.14 7.08 7.4 6.92 7.68 6.77C7.96 6.62 8.25 6.5 8.55 6.4L8.9 4.2H11.1L11.45 6.4C11.75 6.5 12.04 6.62 12.32 6.77C12.6 6.92 12.86 7.08 13.1 7.27L15.15 6.35L16.25 8.25L14.45 9.58C14.48 9.75 14.5 9.92 14.51 10.09C14.53 10.26 14.54 10.43 14.54 10.6C14.54 10.77 14.53 10.94 14.51 11.11C14.5 11.28 14.48 11.45 14.45 11.62L16.25 12.95L15.15 14.85L13.1 13.93C12.86 14.12 12.6 14.28 12.32 14.43C12.04 14.58 11.75 14.7 11.45 14.8L11.1 17H8.9ZM10 12.85C10.62 12.85 11.15 12.63 11.59 12.19C12.03 11.75 12.25 11.22 12.25 10.6C12.25 9.98 12.03 9.45 11.59 9.01C11.15 8.57 10.62 8.35 10 8.35C9.38 8.35 8.85 8.57 8.41 9.01C7.97 9.45 7.75 9.98 7.75 10.6C7.75 11.22 7.97 11.75 8.41 12.19C8.85 12.63 9.38 12.85 10 12.85Z"
         fill="currentColor"
       />
-    </svg>
-  );
-}
-
-function FilterIcon() {
-  return (
-    <svg className="filter-icon" viewBox="0 0 20 20" aria-hidden="true">
-      <path d="M4 5H16L11.2 10.55V15.2L8.8 16.4V10.55L4 5Z" />
     </svg>
   );
 }

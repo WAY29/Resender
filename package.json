@@ -1,6 +1,6 @@
 {
   "name": "resender",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "description": "A Chrome DevTools extension for editing and resending Fetch/XHR requests.",
@@ -24,6 +24,9 @@
     "vite": "^6.0.5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/chrome": "^0.0.287",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.0.2",

@@ -72,8 +72,16 @@ const messages = {
       focusResponseAfterResend: "Show Response after resend",
       filter: "Filter",
       filterPlaceholder: "Filter",
+      filterSuggestions: "Filter suggestions",
       invert: "Invert",
-      moreFilters: "More filters"
+      moreFilters: "More filters",
+      filterIssueUnsupportedKey: (token: string) => `Unsupported filter token: ${token}`,
+      filterIssueInvalidRegex: (token: string) => `Invalid regular expression token: ${token}`,
+      filterIssueInvalidLargerThan: (token: string) => `Invalid larger-than token: ${token}`,
+      filterIssueInvalidStatusCode: (token: string) => `Invalid status-code token: ${token}`,
+      filterIssueInvalidResourceType: (token: string) => `Invalid resource-type token: ${token}`,
+      filterIssueInvalidPropertyValue: (token: string) => `Invalid filter token: ${token}`,
+      filterNoticeApproximateLargerThan: "larger-than uses the best available size for non-HAR records and may be approximate."
     },
     table: {
       resizeListDetails: "Resize request list and details",
@@ -212,8 +220,16 @@ const messages = {
       focusResponseAfterResend: "重放后显示 Response",
       filter: "过滤",
       filterPlaceholder: "过滤",
+      filterSuggestions: "过滤建议",
       invert: "反转",
-      moreFilters: "更多过滤条件"
+      moreFilters: "更多过滤条件",
+      filterIssueUnsupportedKey: (token: string) => `暂不支持的过滤 token：${token}`,
+      filterIssueInvalidRegex: (token: string) => `无效的正则 token：${token}`,
+      filterIssueInvalidLargerThan: (token: string) => `无效的 larger-than token：${token}`,
+      filterIssueInvalidStatusCode: (token: string) => `无效的 status-code token：${token}`,
+      filterIssueInvalidResourceType: (token: string) => `无效的 resource-type token：${token}`,
+      filterIssueInvalidPropertyValue: (token: string) => `无效的过滤 token：${token}`,
+      filterNoticeApproximateLargerThan: "对于非 HAR 记录，larger-than 会使用当前可用的最佳大小，结果可能是近似值。"
     },
     table: {
       resizeListDetails: "调整请求列表和详情宽度",

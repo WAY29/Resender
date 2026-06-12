@@ -210,6 +210,7 @@ button {
 }
 
 .toolbar-filters {
+  align-items: flex-start;
   border-top: 1px solid var(--toolbar-border-soft);
 }
 
@@ -371,6 +372,18 @@ button {
   white-space: nowrap;
 }
 
+.filter-stack {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 360px;
+  flex: 1 1 auto;
+}
+
+.filter-field-shell {
+  position: relative;
+}
+
 .filter-box {
   display: flex;
   align-items: center;
@@ -398,6 +411,13 @@ button {
   background: transparent;
   color: var(--text);
   box-shadow: none;
+}
+
+.toolbar-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
 }
 
 .type-chips {
@@ -445,6 +465,47 @@ button {
   background: transparent;
   color: var(--status-text);
   cursor: pointer;
+}
+
+.filter-feedback {
+  max-width: 720px;
+}
+
+.filter-autocomplete {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  min-width: min(360px, 100%);
+  max-width: min(420px, 100%);
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--popover-shadow);
+}
+
+.filter-autocomplete-option {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.filter-autocomplete-option:hover,
+.filter-autocomplete-option.active {
+  background: var(--panel-raised);
+}
+
+.filter-autocomplete-label {
+  font-family: var(--font-code);
 }
 
 .workbench {
