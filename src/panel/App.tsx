@@ -35,6 +35,7 @@ import {
 } from "./headers";
 import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
+import { RequestTable } from "./requestTable";
 import {
   buildPreviewSrcDoc,
   describeJsonValue,
@@ -59,6 +60,7 @@ import {
 import { nextSortState, sortRecords, type SortColumn, type SortState } from "./requestSort";
 import { getRequestColumns, i18n, translateReason } from "./i18n";
 import { parseImportedRecords } from "./importExport";
+import { appendFilterToken } from "./requestContextMenu";
 import { NetworkFilterBar } from "./filterBar";
 import "./styles.css";
 
@@ -252,7 +254,7 @@ export function App() {
   function exportEnhancedHar() {
     const payload = {
       tool: "Resender",
-      version: "0.2.4",
+      version: "0.2.5",
       exportedAt: new Date().toISOString(),
       bodyLimitBytes,
       records
@@ -325,11 +327,14 @@ export function App() {
         <RequestTable
           records={filteredRecords}
           selectedId={selectedId}
+          filter={filter}
           onSelect={selectRecord}
           onSortChange={(column) => setSortState((current) => nextSortState(current, column))}
           onColumnResize={(column, width) =>
             setColumnWidths((current) => ({ ...current, [column]: width }))
           }
+          onFilterTokenAppend={(token) => setFilter((current) => appendFilterToken(current, token))}
+          onStatus={setStatusMessage}
           listWidthPercent={listWidthPercent}
           gridTemplate={requestGridTemplate}
           columnWidths={columnWidths}
@@ -464,183 +469,6 @@ export function Toolbar(props: {
 
       <NetworkFilterBar filter={props.filter} records={props.records} onFilterChange={props.onFilterChange} />
     </header>
-  );
-}
-
-function RequestTable(props: {
-  records: NetworkRecord[];
-  selectedId?: string;
-  onSelect: (id: string) => void;
-  onSortChange: (column: SortColumn) => void;
-  onColumnResize: (column: SortColumn, width: number) => void;
-  listWidthPercent: number;
-  gridTemplate: string;
-  columnWidths: Record<SortColumn, number>;
-  sortState: SortState;
-  isDetailsOpen: boolean;
-}) {
-  const requestListStyle = {
-    width: props.isDetailsOpen ? `${props.listWidthPercent}%` : "100%",
-    "--request-columns": props.gridTemplate
-  } as CSSProperties;
-
-  return (
-    <section className="request-list" style={requestListStyle}>
-      <div className="request-header request-row">
-        <span className="request-type-spacer" aria-hidden="true" />
-        {requestColumns.map((column) => (
-          <div
-            key={column.id}
-            className={`request-header-cell ${props.sortState?.column === column.id ? "active" : ""}`}
-          >
-            <button
-              type="button"
-              className="sort-header"
-              onClick={() => props.onSortChange(column.id)}
-              aria-label={i18n.table.sortColumn(
-                column.label,
-                props.sortState?.column === column.id ? props.sortState.direction : "none"
-              )}
-            >
-              <span>{column.label}</span>
-              {props.sortState?.column === column.id ? (
-                <SortIcon direction={props.sortState.direction} />
-              ) : null}
-            </button>
-            <span
-              className="column-resizer"
-              role="separator"
-              aria-label={i18n.table.resizeColumn(column.label)}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                const startX = event.clientX;
-                const startWidth = props.columnWidths[column.id];
-                const resize = (moveEvent: PointerEvent) => {
-                  const nextWidth = Math.max(column.minWidth, Math.round(startWidth + moveEvent.clientX - startX));
-                  props.onColumnResize(column.id, nextWidth);
-                };
-                const stop = () => {
-                  window.removeEventListener("pointermove", resize);
-                  window.removeEventListener("pointerup", stop);
-                };
-                window.addEventListener("pointermove", resize);
-                window.addEventListener("pointerup", stop);
-              }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="request-body">
-        {props.records.length === 0 ? (
-          <div className="empty-state">{i18n.table.noRequests}</div>
-        ) : (
-          props.records.map((record) => (
-            <button
-              key={record.id}
-              type="button"
-              className={`request-row request-item ${props.selectedId === record.id ? "selected" : ""}`}
-              onClick={() => props.onSelect(record.id)}
-            >
-              <RequestTypeIcon record={record} />
-              <span className="name-cell" title={record.url}>
-                {record.resent ? <ResenderIcon title={i18n.table.resentRequest} /> : null}
-                {record.name}
-              </span>
-              <span>{record.method}</span>
-              <span title={record.domain}>{record.domain}</span>
-              <span className={`status-cell ${statusClassName(record.status)}`}>
-                <span>{record.status ?? "-"}</span>
-                {record.redirectSourceId ? (
-                  <RedirectJumpButton
-                    direction="source"
-                    onClick={() => props.onSelect(record.redirectSourceId!)}
-                  />
-                ) : null}
-                {record.redirectTargetId ? (
-                  <RedirectJumpButton
-                    direction="target"
-                    onClick={() => props.onSelect(record.redirectTargetId!)}
-                  />
-                ) : null}
-              </span>
-              <span>{record.type}</span>
-              <span className="initiator-cell" title={record.initiator}>
-                <InitiatorCell record={record} />
-              </span>
-              <span>{record.sizeText}</span>
-              <span>{formatDuration(record.timeMs)}</span>
-            </button>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RedirectJumpButton(props: { direction: "source" | "target"; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className={`redirect-jump ${props.direction}`}
-      title={props.direction === "target" ? i18n.table.jumpToRedirectedRequest : i18n.table.jumpToRedirectSource}
-      onClick={(event) => {
-        event.stopPropagation();
-        props.onClick();
-      }}
-    >
-      {props.direction === "target" ? "->" : "<-"}
-    </button>
-  );
-}
-
-function InitiatorCell({ record }: { record: NetworkRecord }) {
-  if (!record.initiator) {
-    return "-";
-  }
-
-  if (!record.initiatorLocation) {
-    return record.initiator;
-  }
-
-  return (
-    <button
-      type="button"
-      className="initiator-link"
-      title={`${record.initiatorLocation.url}:${(record.initiatorLocation.lineNumber ?? 0) + 1}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (!openSourceLocation(record.initiatorLocation!)) {
-          window.open(record.initiatorLocation!.url, "_blank", "noopener,noreferrer");
-        }
-      }}
-    >
-      {record.initiator}
-    </button>
-  );
-}
-
-function RequestTypeIcon({ record }: { record: NetworkRecord }) {
-  const icon = getNetworkIconData(record);
-  const thumbnailSrc = icon.iconName === "file-image" ? getPreviewImageSrc(getPreviewModel(record.responseBody)) : undefined;
-
-  return (
-    <span
-      className="request-type-icon"
-      title={icon.label}
-      aria-label={icon.label}
-      style={thumbnailSrc ? undefined : { color: `var(${icon.colorVar})` }}
-    >
-      {thumbnailSrc ? <img className="request-type-thumbnail" src={thumbnailSrc} alt="" /> : <NetworkIcon iconName={icon.iconName} />}
-    </span>
-  );
-}
-
-function SortIcon({ direction }: { direction: "asc" | "desc" }) {
-  return (
-    <svg className={`sort-icon ${direction}`} viewBox="0 0 12 12" aria-hidden="true">
-      <path d="M6 3 10 8H2L6 3Z" fill="currentColor" />
-    </svg>
   );
 }
 
@@ -1994,10 +1822,3 @@ function findHarContentTargetIndex(records: NetworkRecord[], source: NetworkReco
   });
 }
 
-function statusClassName(status?: number): string {
-  if (status === undefined) return "";
-  if (status >= 200 && status < 300) return "status-ok";
-  if (status >= 400) return "status-error";
-  if (status >= 300) return "status-redirect";
-  return "";
-}
