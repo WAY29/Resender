@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "npm run icons && tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.2.8",

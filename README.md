@@ -82,6 +82,20 @@ npm run typecheck
 npm run build
 ```
 
+Release a new version:
+
+```sh
+./scripts/release.sh patch
+# or: ./scripts/release.sh minor
+# or: ./scripts/release.sh major
+```
+
+You can also run it with:
+
+```sh
+npm run release -- patch
+```
+
 The production extension is generated in `dist/`. The `dist/` directory is intentionally ignored by Git and published through GitHub Releases instead.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
