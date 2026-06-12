@@ -71,8 +71,8 @@ export function emptyBody(): BodyCapture {
   return { kind: "empty", text: "", sizeBytes: 0 };
 }
 
-export function unavailableBody(reason: string): BodyCapture {
-  return { kind: "unavailable", reason };
+export function unavailableBody(reason: string, mimeType?: string): BodyCapture {
+  return { kind: "unavailable", reason, mimeType };
 }
 
 export function textBody(text: string, mimeType?: string, encoding?: string): BodyCapture {
@@ -100,6 +100,7 @@ export function normaliseHarEntry(
   const initiator = inferInitiator(entry);
   const redirectTargetUrl = inferRedirectTargetUrl(entry.request.url, responseHeaders, entry.response);
   const status = normaliseStatus(entry.response.status, redirectTargetUrl);
+  const responseMimeType = findHeader(responseHeaders, "content-type") ?? entry.response.content?.mimeType;
 
   return {
     id,
@@ -120,7 +121,7 @@ export function normaliseHarEntry(
     requestHeaders,
     responseHeaders,
     requestBody,
-    responseBody: unavailableBody("Response body has not been loaded from DevTools yet."),
+    responseBody: unavailableBody("Response body has not been loaded from DevTools yet.", responseMimeType),
     redirectTargetUrl,
     unsupportedReason: inferUnsupportedReason(resourceType, requestBody)
   };
@@ -134,11 +135,14 @@ export function applyHarResponseBody(
   if (content === undefined || content === null) {
     return {
       ...record,
-      responseBody: unavailableBody("DevTools did not return response content for this request.")
+      responseBody: unavailableBody(
+        "DevTools did not return response content for this request.",
+        record.responseBody.mimeType ?? findHeader(record.responseHeaders, "content-type")
+      )
     };
   }
 
-  const mimeType = findHeader(record.responseHeaders, "content-type");
+  const mimeType = findHeader(record.responseHeaders, "content-type") ?? record.responseBody.mimeType;
   const responseBody = textBodyFromHarContent(content, mimeType, encoding);
   const sizeBytes = mergeSizeBytes(record.sizeBytes, responseBody.sizeBytes);
 

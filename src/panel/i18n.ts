@@ -160,7 +160,9 @@ const messages = {
       removeHeader: (name: string) => `Remove ${name}`,
       removeQueryParam: (name: string) => `Remove query parameter ${name}`,
       noHeadersCaptured: "No headers captured.",
-      size: "Size"
+      size: "Size",
+      largeCodeViewFormattingFallback: "Large body: auto-formatting is disabled for performance, but syntax highlighting remains enabled.",
+      largeCodeViewPlaintextFallback: "Very large body: syntax highlighting and auto-formatting are disabled for performance."
     },
     reason: {
       responseNotLoaded: "Response body has not been loaded from DevTools yet.",
@@ -331,7 +333,9 @@ const messages = {
       removeHeader: (name: string) => `删除 ${name}`,
       removeQueryParam: (name: string) => `删除 Query 参数 ${name}`,
       noHeadersCaptured: "未捕获到 Headers",
-      size: "大小"
+      size: "大小",
+      largeCodeViewFormattingFallback: "正文较大：为保证性能，已关闭自动格式化，但仍保留语法高亮",
+      largeCodeViewPlaintextFallback: "正文非常大：为保证性能，已关闭语法高亮和自动格式化"
     },
     reason: {
       responseNotLoaded: "响应正文尚未从 DevTools 加载",

@@ -941,6 +941,20 @@ button {
   color: var(--muted);
 }
 
+.code-view-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.code-view-notice {
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: 4px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+}
+
 .code-view {
   border: 1px solid var(--border);
   border-radius: 4px;

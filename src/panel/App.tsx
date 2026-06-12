@@ -33,7 +33,13 @@ import {
   removeHeaderAt,
   splitEditableHeaders
 } from "./headers";
-import { formatCodeTextWithPrettier, tokenizeCode, warmPrettierForMimeType } from "./codeView";
+import {
+  formatCodeTextWithPrettier,
+  shouldDisableCodeFormatting,
+  shouldDisableCodeHighlighting,
+  tokenizeCode,
+  warmPrettierForMimeType
+} from "./codeView";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import { RequestTable } from "./requestTable";
 import {
@@ -674,7 +680,16 @@ function RequestDetails(props: {
           />
         ) : null}
         {props.activeTab === "preview" ? <PreviewView key={props.record.id} record={props.record} /> : null}
-        {props.activeTab === "response" ? <BodyView title={i18n.details.response} body={props.record.responseBody} /> : null}
+        {props.activeTab === "response" ? (
+          <BodyView
+            title={i18n.details.response}
+            body={props.record.responseBody}
+            mimeType={
+              findHeader(props.record.responseHeaders, "content-type") ??
+              inferCodeMimeType(props.record.responseBody, props.record.type)
+            }
+          />
+        ) : null}
       </div>
     </aside>
   );
@@ -829,18 +844,34 @@ function PayloadEditor(props: {
   );
 }
 
-function BodyView({ title, body }: { title: string; body: BodyCapture }) {
+function inferCodeMimeType(body: BodyCapture, recordType?: NetworkRecord["type"]): string | undefined {
+  if (body.mimeType) {
+    return body.mimeType;
+  }
+
+  if (recordType === "script") {
+    return "application/javascript";
+  }
+
+  if (recordType === "css") {
+    return "text/css";
+  }
+
+  return undefined;
+}
+
+function BodyView({ title, body, mimeType }: { title: string; body: BodyCapture; mimeType?: string }) {
   useEffect(() => {
     if (body.kind === "text" || body.kind === "json" || body.kind === "form") {
-      void warmPrettierForMimeType(body.mimeType, body.text);
+      void warmPrettierForMimeType(mimeType, body.text);
     }
-  }, [body]);
+  }, [body, mimeType]);
 
   return (
     <div className="body-view">
       <h3>{title}</h3>
       {body.kind === "text" || body.kind === "json" || body.kind === "form" ? (
-        <CodeView text={body.text ?? ""} mimeType={body.mimeType} />
+        <CodeView text={body.text ?? ""} mimeType={mimeType} />
       ) : body.kind === "empty" ? (
         <p className="muted">{i18n.details.noBody}</p>
       ) : (
@@ -851,9 +882,13 @@ function BodyView({ title, body }: { title: string; body: BodyCapture }) {
 }
 
 function PreviewView({ record }: { record: NetworkRecord }) {
-  const preview = useMemo(() => getPreviewModel(record.responseBody), [record.responseBody]);
+  const responseMimeType =
+    record.responseBody.mimeType ??
+    findHeader(record.responseHeaders, "content-type") ??
+    inferCodeMimeType(record.responseBody, record.type);
+  const preview = useMemo(() => getPreviewModel({ ...record.responseBody, mimeType: responseMimeType }), [record.responseBody, responseMimeType]);
   const imageSrc = useMemo(() => getPreviewImageSrc(preview), [preview]);
-  const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(record.responseBody.mimeType));
+  const [previewScale, setPreviewScale] = useState(() => getDefaultPreviewScale(responseMimeType));
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>();
   const [imageViewportHeight, setImageViewportHeight] = useState<number>();
   const [hasManualZoom, setHasManualZoom] = useState(false);
@@ -863,12 +898,12 @@ function PreviewView({ record }: { record: NetworkRecord }) {
   const fitRafRef = useRef<number | undefined>(undefined);
 
   useLayoutEffect(() => {
-    setPreviewScale(getDefaultPreviewScale(record.responseBody.mimeType));
+    setPreviewScale(getDefaultPreviewScale(responseMimeType));
     setHasManualZoom(false);
     setImageNaturalSize(undefined);
     setImageViewportHeight(undefined);
     setIsImageReady(false);
-  }, [record.id, record.responseBody.mimeType, imageSrc]);
+  }, [record.id, responseMimeType, imageSrc]);
 
   useEffect(() => {
     if (!imageSrc) {
@@ -1063,24 +1098,7 @@ function PreviewView({ record }: { record: NetworkRecord }) {
 }
 
 function TextPreview({ text, mimeType }: { text: string; mimeType?: string }) {
-  const [displayText, setDisplayText] = useState(() => text);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setDisplayText(text);
-    void formatCodeTextWithPrettier(text, mimeType).then((formatted) => {
-      if (!cancelled) {
-        setDisplayText(formatted);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mimeType, text]);
-
-  return <pre className="preview-text">{displayText}</pre>;
+  return <CodeView text={text} mimeType={mimeType} />;
 }
 
 function JsonPreviewTree({ value }: { value: JsonValue }) {
@@ -1204,6 +1222,8 @@ function UnavailableBodyView(props: {
 
 function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
   const [displayText, setDisplayText] = useState(() => text);
+  const formattingDisabled = shouldDisableCodeFormatting(text);
+  const highlightingDisabled = shouldDisableCodeHighlighting(text);
 
   useEffect(() => {
     let cancelled = false;
@@ -1223,19 +1243,23 @@ function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
   const lines = tokenizeCode(displayText, mimeType);
 
   return (
-    <div className="code-view">
-      {lines.map((line) => (
-        <div key={line.lineNumber} className="code-line">
-          <span className="line-number">{line.lineNumber}</span>
-          <code>
-            {line.tokens.map((token, index) => (
-              <span key={`${line.lineNumber}-${index}`} className={`token-${token.kind}`}>
-                {token.text}
-              </span>
-            ))}
-          </code>
-        </div>
-      ))}
+    <div className="code-view-shell">
+      {highlightingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewPlaintextFallback}</div> : null}
+      {!highlightingDisabled && formattingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewFormattingFallback}</div> : null}
+      <div className="code-view">
+        {lines.map((line) => (
+          <div key={line.lineNumber} className="code-line">
+            <span className="line-number">{line.lineNumber}</span>
+            <code>
+              {line.tokens.map((token, index) => (
+                <span key={`${line.lineNumber}-${index}`} className={`token-${token.kind}`}>
+                  {token.text}
+                </span>
+              ))}
+            </code>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

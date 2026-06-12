@@ -29,10 +29,19 @@ const prettierPluginLoaders = {
   postcss: () => import("prettier/plugins/postcss")
 } as const;
 
+const maxHighlightCharacters = 120_000;
+const maxHighlightLines = 4_000;
+const maxFormattingCharacters = 40_000;
+const maxFormattingLines = 1_500;
+
 let prettierModulePromise: Promise<PrettierModule> | undefined;
 const prettierPluginPromises = new Map<keyof typeof prettierPluginLoaders, Promise<object>>();
 
 export async function formatCodeTextWithPrettier(text: string, mimeType?: string): Promise<string> {
+  if (shouldDisableCodeFormatting(text)) {
+    return text;
+  }
+
   const config = getPrettierConfig(mimeType, text);
   if (!config) {
     return formatFallback(text, mimeType);
@@ -51,6 +60,10 @@ export async function formatCodeTextWithPrettier(text: string, mimeType?: string
 }
 
 export function tokenizeCode(text: string, mimeType?: string): CodeLine[] {
+  if (shouldDisableCodeHighlighting(text)) {
+    return plainTextLines(text);
+  }
+
   const language = languageFromMimeType(mimeType, text);
   if (!language) {
     return text.split(/\r?\n/).map((line, index) => ({
@@ -71,12 +84,49 @@ export function tokenizeCode(text: string, mimeType?: string): CodeLine[] {
 }
 
 export function warmPrettierForMimeType(mimeType?: string, text?: string): Promise<void> {
+  if (text && shouldDisableCodeFormatting(text)) {
+    return Promise.resolve();
+  }
+
   const config = getPrettierConfig(mimeType, text);
   if (!config) {
     return Promise.resolve();
   }
 
   return Promise.all([loadPrettier(), config.loadPlugins()]).then(() => undefined);
+}
+
+export function shouldDisableCodeFormatting(text: string): boolean {
+  return exceedsCodeViewThreshold(text, maxFormattingCharacters, maxFormattingLines);
+}
+
+export function shouldDisableCodeHighlighting(text: string): boolean {
+  return exceedsCodeViewThreshold(text, maxHighlightCharacters, maxHighlightLines);
+}
+
+function exceedsCodeViewThreshold(text: string, maxCharacters: number, maxLines: number): boolean {
+  if (text.length > maxCharacters) {
+    return true;
+  }
+
+  let lineCount = 1;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) === 10) {
+      lineCount += 1;
+      if (lineCount > maxLines) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function plainTextLines(text: string): CodeLine[] {
+  return text.split(/\r?\n/).map((line, index) => ({
+    lineNumber: index + 1,
+    tokens: [{ kind: "plain", text: line }]
+  }));
 }
 
 function formatFallback(text: string, mimeType?: string): string {
@@ -127,6 +177,7 @@ function languageFromMimeType(mimeType?: string, text?: string): string | undefi
   if (
     contentType === "text/javascript" ||
     contentType === "application/javascript" ||
+    contentType === "application/x-javascript" ||
     contentType.includes("ecmascript")
   ) {
     return "javascript";
@@ -248,6 +299,7 @@ function getPrettierConfig(mimeType?: string, text?: string): PrettierConfig | u
   if (
     contentType === "text/javascript" ||
     contentType === "application/javascript" ||
+    contentType === "application/x-javascript" ||
     contentType.includes("ecmascript")
   ) {
     return {

@@ -187,6 +187,41 @@ describe("normaliseHarEntry", () => {
     expect(updated.sizeText).toBe("20 B");
   });
 
+  it("keeps HAR response mime types when DevTools omits response headers", () => {
+    const record = normaliseHarEntry(
+      {
+        startedDateTime: "2026-01-01T00:00:00.000Z",
+        time: 3,
+        request: {
+          method: "GET",
+          url: "https://example.test/app.js",
+          headers: []
+        },
+        response: {
+          status: 200,
+          statusText: "OK",
+          headers: [],
+          content: { mimeType: "application/javascript;charset=utf-8", size: -1 }
+        },
+        _resourceType: "script"
+      },
+      "har:missing-response-header"
+    );
+
+    expect(record.responseBody).toMatchObject({
+      kind: "unavailable",
+      mimeType: "application/javascript;charset=utf-8"
+    });
+
+    const updated = applyHarResponseBody(record, "const answer = 42;", "");
+
+    expect(updated.responseBody).toMatchObject({
+      kind: "text",
+      mimeType: "application/javascript;charset=utf-8",
+      text: "const answer = 42;"
+    });
+  });
+
   it("uses top-level initiator URLs when no stack call frame exists", () => {
     const record = normaliseHarEntry(
       {
