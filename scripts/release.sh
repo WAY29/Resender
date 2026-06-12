@@ -50,12 +50,40 @@ npm version "$bump_type" --no-git-tag-version >/dev/null
 new_version="$(node -p "require('./package.json').version")"
 new_tag="v${new_version}"
 
+node <<'EOF'
+const fs = require('fs');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const newVersion = packageJson.version;
+
+const manifestPath = 'public/manifest.json';
+if (fs.existsSync(manifestPath)) {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.version = newVersion;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+}
+
+const appPath = 'src/panel/App.tsx';
+if (fs.existsSync(appPath)) {
+  const source = fs.readFileSync(appPath, 'utf8');
+  const updated = source.replace(/version: \"[^\"]+\",/, `version: \"${newVersion}\",`);
+  if (updated !== source) {
+    fs.writeFileSync(appPath, updated);
+  }
+}
+EOF
+
 if git rev-parse "$new_tag" >/dev/null 2>&1; then
   echo "Error: tag ${new_tag} already exists." >&2
   exit 1
 fi
 
 files=(package.json)
+if [[ -f public/manifest.json ]]; then
+  files+=(public/manifest.json)
+fi
+if [[ -f src/panel/App.tsx ]]; then
+  files+=(src/panel/App.tsx)
+fi
 if [[ -f package-lock.json ]]; then
   files+=(package-lock.json)
 fi
