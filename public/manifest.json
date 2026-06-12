@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
   "icons": {
@@ -20,8 +20,13 @@
     }
   },
   "devtools_page": "devtools.html",
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "minimum_chrome_version": "114",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
