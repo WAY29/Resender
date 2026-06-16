@@ -258,7 +258,7 @@ export function App() {
   function exportEnhancedHar() {
     const payload = {
       tool: "Resender",
-      version: "0.3.0",
+      version: "0.4.0",
       exportedAt: new Date().toISOString(),
       bodyLimitBytes,
       records
