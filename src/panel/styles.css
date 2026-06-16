@@ -377,7 +377,8 @@ button {
   display: grid;
   gap: 6px;
   min-width: 360px;
-  flex: 1 1 auto;
+  width: clamp(360px, 60%, 680px);
+  flex: 0 1 auto;
 }
 
 .filter-field-shell {
@@ -388,6 +389,7 @@ button {
   display: flex;
   align-items: center;
   min-width: 360px;
+  width: 100%;
   height: 22px;
   padding: 0 8px;
   gap: 6px;
@@ -416,8 +418,11 @@ button {
 .toolbar-filter-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
   min-height: 22px;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .type-chips {
@@ -1775,6 +1780,11 @@ button {
 @media (max-width: 1080px) {
   body {
     min-width: 720px;
+  }
+
+  .filter-stack {
+    width: clamp(360px, 52%, 560px);
+    flex-basis: auto;
   }
 
   .workbench {

@@ -40,6 +40,16 @@ describe("NetworkFilterBar", () => {
     });
   });
 
+  it("suggests new body keys from the input", async () => {
+    const user = userEvent.setup();
+    renderBar({ query: "bo", invert: false, type: "all" });
+
+    const input = screen.getByLabelText("Filter");
+    await user.click(input);
+
+    expect(screen.getByRole("option", { name: "body:" })).toBeInTheDocument();
+  });
+
   it("supports arrow navigation and Tab acceptance", async () => {
     const user = userEvent.setup();
     const { onFilterChange } = renderBar({ query: "resource-type:s", invert: false, type: "all" });

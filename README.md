@@ -110,6 +110,22 @@ The production extension is generated in `dist/`. The `dist/` directory is inten
 6. Edit request headers or payload, then click `Send` to replay it.
 7. Use import/export to move captured request sets between sessions.
 
+### Filter syntax
+
+The filter bar supports space-separated tokens, and all positive tokens must match the same request.
+
+- Plain text matches the decoded `host/path?query` portion of the request URL, for example `users`.
+- Quoted text matches phrases with spaces, for example `"user list"`.
+- Regular expressions use JavaScript syntax, for example `/users/i`.
+- Prefix any token with `-` to negate it, for example `-status-code:404`.
+- Property filters support the following keys:
+  - `status-code:200`, `method:post`, `url:"/api/users"`, `domain:*.example.test`, `scheme:https`
+  - `mime-type:application/json`, `resource-type:script`, `larger-than:10k`
+  - `has-response-header:content-type`, `response-header-set-cookie:session=abc`
+  - `set-cookie-name:session`, `set-cookie-value:abc`, `set-cookie-domain:example.test`
+  - `body:admin` matches request bodies containing `admin`
+  - `response-body:"user list"` matches response bodies containing `user list`
+
 Some browser-controlled headers cannot be replayed because Chrome and Fetch own them. Binary, streaming, oversized, and unsupported request bodies are displayed for context but are not editable yet.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

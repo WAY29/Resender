@@ -96,6 +96,22 @@ npm run build
 6. 编辑请求头或 Payload，然后点击 `发送` 重放请求
 7. 使用导入/导出功能在不同会话之间迁移捕获记录
 
+### 过滤语法
+
+过滤框支持使用空格分隔多个 token，所有正向 token 都必须同时命中同一个请求。
+
+- 普通文本会匹配请求 URL 中解码后的 `host/path?query` 部分，例如 `users`
+- 引号文本可匹配包含空格的短语，例如 `"user list"`
+- 正则表达式使用 JavaScript 语法，例如 `/users/i`
+- 在任意 token 前加 `-` 可表示取反，例如 `-status-code:404`
+- 属性过滤目前支持这些 key：
+  - `status-code:200`、`method:post`、`url:"/api/users"`、`domain:*.example.test`、`scheme:https`
+  - `mime-type:application/json`、`resource-type:script`、`larger-than:10k`
+  - `has-response-header:content-type`、`response-header-set-cookie:session=abc`
+  - `set-cookie-name:session`、`set-cookie-value:abc`、`set-cookie-domain:example.test`
+  - `body:admin` 用于匹配请求体中包含 `admin` 的请求
+  - `response-body:"user list"` 用于匹配响应体中包含 `user list` 的请求
+
 部分浏览器控制的请求头无法重放，因为它们由 Chrome 和 Fetch 管理。二进制、流式、超限和不支持的请求体会用于上下文展示，但暂时不可编辑。
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>

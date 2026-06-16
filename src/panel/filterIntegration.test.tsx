@@ -22,6 +22,18 @@ describe("Network filter integration", () => {
     expect(screen.getByTestId("visible-names")).toHaveTextContent("app.js");
   });
 
+  it("filters by request and response body property queries", async () => {
+    const user = userEvent.setup();
+    renderHarness(records);
+
+    await user.type(screen.getByLabelText("Filter"), "body:admin");
+    expect(screen.getByTestId("visible-names")).toHaveTextContent("users");
+
+    await user.clear(screen.getByLabelText("Filter"));
+    await user.type(screen.getByLabelText("Filter"), 'response-body:"user list"');
+    expect(screen.getByTestId("visible-names")).toHaveTextContent("users");
+  });
+
   it("keeps incomplete tokens neutral and warning-free", async () => {
     const user = userEvent.setup();
     renderHarness(records);
@@ -128,6 +140,8 @@ const records: NetworkRecord[] = [
     status: 201,
     sizeBytes: 900,
     source: "hook",
+    requestBody: { kind: "json", text: '{"role":"Admin","include":"profile"}', sizeBytes: 36 },
+    responseBody: { kind: "json", text: '{"message":"user list created","id":1}', sizeBytes: 40 },
     responseHeaders: [{ name: "content-type", value: "application/json" }]
   }),
   record("logo.png", {

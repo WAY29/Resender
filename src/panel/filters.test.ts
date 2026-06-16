@@ -113,11 +113,16 @@ describe("parseNetworkFilterQuery", () => {
     ).toEqual(expectedTokens);
   });
 
-  it("parses supported DevTools-style property filters and quoted phrases", () => {
-    const parsed = parseNetworkFilterQuery('status-code:200 method:"GET" "user list"');
+  it("parses supported DevTools-style property filters including body fields and quoted phrases", () => {
+    const parsed = parseNetworkFilterQuery('status-code:200 method:"GET" body:admin response-body:"user list"');
 
     expect(parsed.issues).toHaveLength(0);
-    expect(parsed.tokens.map((token) => token.kind)).toEqual(["property", "property", "text"]);
+    expect(parsed.tokens).toMatchObject([
+      { kind: "property", key: "status-code", value: "200" },
+      { kind: "property", key: "method", value: "GET" },
+      { kind: "property", key: "body", value: "admin" },
+      { kind: "property", key: "response-body", value: "user list" }
+    ]);
   });
 
   it("treats unknown keys as plain text", () => {
@@ -215,6 +220,7 @@ describe("matchesFilter", () => {
       { name: "cache-control", value: "public, max-age=60" },
       { name: "set-cookie", value: "session=abc; Domain=example.test; Path=/" }
     ],
+    responseBody: { kind: "text", text: 'console.log("App ready")', sizeBytes: 24 },
     status: 200,
     sizeBytes: 4096
   });
@@ -224,6 +230,8 @@ describe("matchesFilter", () => {
     method: "POST",
     url: "https://api.example.test/v1/users/list",
     domain: "api.example.test",
+    requestBody: { kind: "json", text: '{"role":"Admin","include":"profile"}', sizeBytes: 36 },
+    responseBody: { kind: "json", text: '{"message":"user list created","id":1}', sizeBytes: 40 },
     responseHeaders: [{ name: "content-type", value: "application/json" }],
     status: 201,
     sizeBytes: 900,
@@ -302,6 +310,8 @@ describe("matchesFilter", () => {
     expect(matchesFilter(scriptRecord, { ...defaultFilterState, query: "set-cookie-domain:example.test" })).toBe(true);
     expect(matchesFilter(scriptRecord, { ...defaultFilterState, query: "set-cookie-name:session" })).toBe(true);
     expect(matchesFilter(scriptRecord, { ...defaultFilterState, query: "set-cookie-value:abc" })).toBe(true);
+    expect(matchesFilter(apiRecord, { ...defaultFilterState, query: "body:admin" })).toBe(true);
+    expect(matchesFilter(apiRecord, { ...defaultFilterState, query: 'response-body:"user list"' })).toBe(true);
   });
 
   it("supports canonical resource types and one-to-one aliases only", () => {
@@ -430,6 +440,14 @@ describe("filter autocomplete", () => {
 
     const schemeAutocomplete = getFilterAutocomplete("scheme:h", "scheme:h".length);
     expect(schemeAutocomplete?.suggestions.map((suggestion) => suggestion.label)).toEqual(["http", "https"]);
+  });
+
+  it("suggests body filter keys", () => {
+    const bodyAutocomplete = getFilterAutocomplete("bo", 2);
+    expect(bodyAutocomplete?.suggestions[0]).toMatchObject({ label: "body:" });
+
+    const responseBodyAutocomplete = getFilterAutocomplete("response-b", "response-b".length);
+    expect(responseBodyAutocomplete?.suggestions[0]).toMatchObject({ label: "response-body:" });
   });
 
   it("replaces only the current token when applying a suggestion", () => {

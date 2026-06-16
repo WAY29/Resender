@@ -2,8 +2,10 @@ import type { FilterState, HeaderPair, NetworkRecord, ResourceType } from "../ty
 import { findHeader } from "./headers";
 
 export const supportedFilterKeys = [
+  "body",
   "domain",
   "has-response-header",
+  "response-body",
   "response-header-set-cookie",
   "larger-than",
   "method",
@@ -77,8 +79,10 @@ export type FilterNotice = {
 };
 
 type PropertyMatcher =
+  | { kind: "body"; text: string }
   | { kind: "domain"; regex: RegExp }
   | { kind: "has-response-header"; headerName: string }
+  | { kind: "response-body"; text: string }
   | { kind: "response-header-set-cookie"; text: string }
   | { kind: "larger-than"; minBytes: number }
   | { kind: "method"; method: string }
@@ -588,6 +592,8 @@ function parseSupportedPropertyToken(
   value: string
 ): ParsedPropertyToken {
   switch (key) {
+    case "body":
+      return validPropertyToken(token, key, value, { kind: "body", text: value.toLowerCase() });
     case "domain": {
       const pattern = value
         .split("*")
@@ -602,6 +608,11 @@ function parseSupportedPropertyToken(
       return validPropertyToken(token, key, value, {
         kind: "has-response-header",
         headerName: value.toLowerCase()
+      });
+    case "response-body":
+      return validPropertyToken(token, key, value, {
+        kind: "response-body",
+        text: value.toLowerCase()
       });
     case "response-header-set-cookie":
       return validPropertyToken(token, key, value, {
@@ -733,10 +744,14 @@ function matchesParsedToken(record: NetworkRecord, token: ParsedFilterToken): bo
 
 function matchesProperty(record: NetworkRecord, matcher: PropertyMatcher): boolean {
   switch (matcher.kind) {
+    case "body":
+      return bodyCaptureIncludes(record.requestBody, matcher.text);
     case "domain":
       return matcher.regex.test(record.domain);
     case "has-response-header":
       return record.responseHeaders.some((header) => header.name.toLowerCase() === matcher.headerName);
+    case "response-body":
+      return bodyCaptureIncludes(record.responseBody, matcher.text);
     case "response-header-set-cookie":
       return getSetCookieHeaders(record.responseHeaders).some((value) =>
         stringIncludesCaseInsensitive(value, matcher.text)
@@ -803,6 +818,11 @@ function getSetCookieHeaders(headers: HeaderPair[]): string[] {
   return headers
     .filter((header) => header.name.toLowerCase() === "set-cookie")
     .map((header) => header.value);
+}
+
+function bodyCaptureIncludes(body: NetworkRecord["requestBody"] | NetworkRecord["responseBody"], query: string): boolean {
+  const text = body.text;
+  return typeof text === "string" && stringIncludesCaseInsensitive(text, query);
 }
 
 function getParsedSetCookies(headers: HeaderPair[]): Array<{ name: string; value: string; domain?: string; path?: string }> {
