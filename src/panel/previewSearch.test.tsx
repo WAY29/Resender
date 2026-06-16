@@ -29,12 +29,12 @@ describe("Preview search", () => {
       expect(screen.getByText("1 of 2")).toBeInTheDocument();
     });
 
-    expect(container.querySelector(".floating-search-anchor")).toBeInTheDocument();
+    expect(container.querySelector(".search-dock")).toBeInTheDocument();
   });
 
   it("searches JSON keys and values in preview tree", async () => {
     const user = userEvent.setup();
-    render(
+    const { container } = render(
       <JsonPreviewSearchView
         value={{ status: "OK", nested: { statusText: "Still OK" } }}
         syncState={{ expanded: true, version: 0 }}
@@ -50,6 +50,7 @@ describe("Preview search", () => {
     });
 
     expect(document.querySelectorAll(".code-search-hit")).toHaveLength(2);
+    expect(container.querySelector(".search-dock")).toBeInTheDocument();
   });
 
   it("auto-expands collapsed JSON branches to reveal active matches", async () => {

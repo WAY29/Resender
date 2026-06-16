@@ -643,7 +643,7 @@ function RequestDetails(props: {
           {sending ? i18n.details.sending : i18n.details.send}
         </button>
       </div>
-      <div className="details-content">
+      <div className={`details-content${props.activeTab === "preview" || props.activeTab === "response" ? " details-content-pane" : ""}`}>
         {disabledReason ? <div className="warning detail-warning">{disabledReason}</div> : null}
         {props.activeTab === "headers" ? (
           <HeadersView
@@ -869,7 +869,9 @@ function BodyView({ title, body, mimeType }: { title: string; body: BodyCapture;
     <div className="body-view">
       <h3>{title}</h3>
       {body.kind === "text" || body.kind === "json" || body.kind === "form" ? (
-        <CodeView text={body.text ?? ""} mimeType={mimeType} searchable />
+        <div className="details-scroll-pane">
+          <CodeView text={body.text ?? ""} mimeType={mimeType} searchable />
+        </div>
       ) : body.kind === "empty" ? (
         <p className="muted">{i18n.details.noBody}</p>
       ) : (
@@ -1077,8 +1079,8 @@ function PreviewView({ record }: { record: NetworkRecord }) {
           />
         </div>
       ) : null}
-      {preview.kind === "json" ? <JsonPreviewTree value={preview.value} /> : null}
-      {preview.kind === "text" ? <TextPreview text={preview.text} mimeType={preview.mimeType} /> : null}
+      {preview.kind === "json" ? <div className="details-scroll-pane"><JsonPreviewTree value={preview.value} /></div> : null}
+      {preview.kind === "text" ? <div className="details-scroll-pane"><TextPreview text={preview.text} mimeType={preview.mimeType} /></div> : null}
       {preview.kind === "empty" ? <p className="muted">{i18n.details.noBody}</p> : null}
       {preview.kind === "unavailable" ? (
         <UnavailableBodyView

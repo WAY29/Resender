@@ -147,24 +147,9 @@ export function CodeView({ text, mimeType, searchable = false }: CodeViewProps) 
     invalidRegex: searchError === "invalid-regex"
   });
 
+
   return (
-    <div className={`code-view-shell${searchable && searchOpen ? " has-floating-search" : ""}`}>
-      {searchable && searchOpen ? (
-        <div className="floating-search-anchor">
-          <FloatingSearchBar
-            inputRef={searchInputRef}
-            query={query}
-            statusText={statusText}
-            searchOptions={searchOptions}
-            matchCount={matchCount}
-            invalidRegex={searchError === "invalid-regex"}
-            onQueryChange={setQuery}
-            onOptionsChange={setSearchOptions}
-            onNavigate={goToMatch}
-            onClose={() => setSearchOpen(false)}
-          />
-        </div>
-      ) : null}
+    <div className={`code-view-shell${searchable && searchOpen ? " has-search-dock" : ""}`}>
       {highlightingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewPlaintextFallback}</div> : null}
       {!highlightingDisabled && formattingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewFormattingFallback}</div> : null}
       <div className="code-view-shell-body">
@@ -179,6 +164,22 @@ export function CodeView({ text, mimeType, searchable = false }: CodeViewProps) 
           ))}
         </div>
       </div>
+      {searchable && searchOpen ? (
+        <div className="search-dock">
+          <FloatingSearchBar
+            inputRef={searchInputRef}
+            query={query}
+            statusText={statusText}
+            searchOptions={searchOptions}
+            matchCount={matchCount}
+            invalidRegex={searchError === "invalid-regex"}
+            onQueryChange={setQuery}
+            onOptionsChange={setSearchOptions}
+            onNavigate={goToMatch}
+            onClose={() => setSearchOpen(false)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

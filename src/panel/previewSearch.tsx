@@ -119,8 +119,9 @@ export function JsonPreviewSearchView({ value, syncState }: JsonPreviewSearchVie
     invalidRegex: searchError === "invalid-regex"
   });
 
+
   return (
-    <div className={`preview-search-shell${searchOpen ? " has-floating-search" : ""}`}>
+    <div className={`preview-search-shell${searchOpen ? " has-search-dock" : ""}`}>
       <div className="json-tree" role="tree" ref={treeRef}>
         <JsonPreviewSearchNode
           nodeKey={Array.isArray(value) ? "[]" : "{}"}
@@ -133,7 +134,7 @@ export function JsonPreviewSearchView({ value, syncState }: JsonPreviewSearchVie
         />
       </div>
       {searchOpen ? (
-        <div className="floating-search-anchor">
+        <div className="search-dock">
           <FloatingSearchBar
             inputRef={searchInputRef}
             query={query}

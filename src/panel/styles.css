@@ -907,6 +907,21 @@ button {
   padding: 12px;
 }
 
+.details-content.details-content-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.details-content.details-content-pane > .preview-view,
+.details-content.details-content-pane > .body-view {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+
 .detail-warning {
   margin-bottom: 12px;
 }
@@ -946,44 +961,47 @@ button {
   color: var(--muted);
 }
 
+.code-view-shell,
+.preview-search-shell {
+  min-height: 0;
+  height: 100%;
+}
+
 .code-view-shell {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.code-view-shell.has-floating-search .code-view-shell-body,
-.preview-search-shell.has-floating-search {
-  padding-bottom: 50px;
+.code-view-shell.has-search-dock .code-view,
+.preview-search-shell.has-search-dock .json-tree {
+  padding-bottom: 0;
 }
 
-.code-view-shell-body,
-.preview-search-shell {
-  position: relative;
+.code-view-shell-body {
+  display: flex;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
-.floating-search-anchor {
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
+.preview-search-shell {
   display: flex;
-  justify-content: flex-end;
-  margin-top: -40px;
-  pointer-events: none;
+  flex-direction: column;
+}
+
+.search-dock {
+  flex: 0 0 auto;
+  padding-top: 8px;
 }
 
 .code-search-bar {
   position: relative;
-  right: 10px;
-  bottom: 10px;
-  z-index: 3;
-  pointer-events: auto;
   display: grid;
   grid-template-columns: auto minmax(220px, 1fr) auto auto auto auto auto auto auto;
   align-items: center;
   gap: 4px;
   min-width: min(100%, 560px);
-  max-width: calc(100% - 20px);
+  max-width: 100%;
   padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1090,6 +1108,9 @@ button {
 }
 
 .code-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: auto;
@@ -1254,8 +1275,18 @@ button {
 
 .preview-view,
 .body-view {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.details-scroll-pane {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .preview-frame,
@@ -1268,8 +1299,18 @@ button {
 }
 
 .preview-json-view {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.preview-json-view > .preview-search-shell,
+.details-scroll-pane > .code-view-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .preview-header-row {
@@ -1277,7 +1318,9 @@ button {
 }
 
 .preview-frame-shell {
+  flex: 1 1 auto;
   min-height: 220px;
+  height: 100%;
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1285,6 +1328,8 @@ button {
 }
 
 .preview-image-scroll {
+  flex: 1 1 auto;
+  min-height: 220px;
   overflow: auto;
 }
 
@@ -1336,6 +1381,8 @@ button {
 }
 
 .json-tree {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 8px;
   overflow: auto;
 }
@@ -1808,19 +1855,12 @@ button {
 }
 
 @media (max-width: 820px) {
-  .code-view-shell.has-floating-search .code-view-shell-body,
-  .preview-search-shell.has-floating-search {
-    padding-bottom: 80px;
-  }
-
-  .floating-search-anchor {
-    margin-top: -72px;
+  .code-view-shell.has-search-dock .code-view,
+  .preview-search-shell.has-search-dock .json-tree {
+    padding-bottom: 0;
   }
 
   .code-search-bar {
-    right: 8px;
-    left: 8px;
-    bottom: 8px;
     max-width: none;
     grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
     grid-template-areas:
