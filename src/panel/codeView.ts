@@ -13,6 +13,22 @@ export type CodeLine = {
   tokens: CodeToken[];
 };
 
+export type CodeSearchOptions = {
+  matchCase: boolean;
+  wholeWord: boolean;
+  useRegex: boolean;
+};
+
+export type CodeSearchMatch = {
+  start: number;
+  end: number;
+};
+
+export type CodeSearchResult = {
+  matches: CodeSearchMatch[];
+  error?: "invalid-regex";
+};
+
 type PrettierModule = {
   format: (source: string, options: { parser: string; plugins: object[]; tabWidth?: number }) => Promise<string>;
 };
@@ -96,6 +112,26 @@ export function warmPrettierForMimeType(mimeType?: string, text?: string): Promi
   return Promise.all([loadPrettier(), config.loadPlugins()]).then(() => undefined);
 }
 
+export function normalizeCodeViewText(text: string): string {
+  return text.replace(/\r\n?/g, "\n");
+}
+
+export function findCodeSearchMatches(
+  text: string,
+  query: string,
+  options: CodeSearchOptions
+): CodeSearchResult {
+  if (query.length === 0) {
+    return { matches: [] };
+  }
+
+  if (options.useRegex) {
+    return findRegexCodeSearchMatches(text, query, options);
+  }
+
+  return { matches: findPlainCodeSearchMatches(text, query, options) };
+}
+
 export function shouldDisableCodeFormatting(text: string): boolean {
   return exceedsCodeViewThreshold(text, maxFormattingCharacters, maxFormattingLines);
 }
@@ -127,6 +163,129 @@ function plainTextLines(text: string): CodeLine[] {
     lineNumber: index + 1,
     tokens: [{ kind: "plain", text: line }]
   }));
+}
+
+function findPlainCodeSearchMatches(
+  text: string,
+  query: string,
+  options: Pick<CodeSearchOptions, "matchCase" | "wholeWord">
+): CodeSearchMatch[] {
+  const source = options.matchCase ? text : text.toLocaleLowerCase();
+  const needle = options.matchCase ? query : query.toLocaleLowerCase();
+  const matches: CodeSearchMatch[] = [];
+  let searchStart = 0;
+
+  while (searchStart <= source.length) {
+    const index = source.indexOf(needle, searchStart);
+    if (index === -1) {
+      break;
+    }
+
+    const end = index + needle.length;
+    if (!options.wholeWord || isWholeWordMatch(text, index, end)) {
+      matches.push({ start: index, end });
+    }
+
+    searchStart = index + Math.max(needle.length, 1);
+  }
+
+  return matches;
+}
+
+function findRegexCodeSearchMatches(
+  text: string,
+  query: string,
+  options: Pick<CodeSearchOptions, "matchCase" | "wholeWord">
+): CodeSearchResult {
+  let regex: RegExp;
+
+  try {
+    regex = buildCodeSearchRegex(query, options.matchCase);
+  } catch {
+    return { matches: [], error: "invalid-regex" };
+  }
+
+  const matches: CodeSearchMatch[] = [];
+  let result: RegExpExecArray | null;
+
+  while ((result = regex.exec(text)) !== null) {
+    const matchText = result[0];
+    const start = result.index;
+    const end = start + matchText.length;
+
+    if (matchText.length === 0) {
+      regex.lastIndex += 1;
+      continue;
+    }
+
+    if (!options.wholeWord || isWholeWordMatch(text, start, end)) {
+      matches.push({ start, end });
+    }
+  }
+
+  return { matches };
+}
+
+function isWholeWordMatch(text: string, start: number, end: number): boolean {
+  return !isWordCharacter(text.charAt(start - 1)) && !isWordCharacter(text.charAt(end));
+}
+
+function buildCodeSearchRegex(query: string, matchCase: boolean): RegExp {
+  const literal = parseRegexLiteral(query);
+  const source = literal?.source ?? query;
+  const explicitFlags = literal?.flags ?? "";
+  const flags = new Set(explicitFlags.split("").filter(Boolean));
+
+  if (!matchCase && !flags.has("i")) {
+    flags.add("i");
+  }
+  flags.add("g");
+
+  return new RegExp(source, Array.from(flags).join(""));
+}
+
+function parseRegexLiteral(query: string): { source: string; flags: string } | undefined {
+  if (!query.startsWith("/") || query.length < 2) {
+    return undefined;
+  }
+
+  let escaped = false;
+  let closingSlashIndex = -1;
+
+  for (let index = 1; index < query.length; index += 1) {
+    const character = query.charAt(index);
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (character === "/") {
+      closingSlashIndex = index;
+    }
+  }
+
+  if (closingSlashIndex <= 0) {
+    return undefined;
+  }
+
+  const flags = query.slice(closingSlashIndex + 1);
+  if (!/^[a-z]*$/i.test(flags)) {
+    return undefined;
+  }
+
+  return {
+    source: query.slice(1, closingSlashIndex),
+    flags
+  };
+}
+
+function isWordCharacter(character: string): boolean {
+  return /[\p{L}\p{N}_$]/u.test(character);
 }
 
 function formatFallback(text: string, mimeType?: string): string {

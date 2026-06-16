@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  findCodeSearchMatches,
   formatCodeTextWithPrettier,
+  normalizeCodeViewText,
   shouldDisableCodeFormatting,
   shouldDisableCodeHighlighting,
   tokenizeCode
@@ -138,6 +140,71 @@ describe("code tokenization", () => {
     const [line] = tokenizeCode(largeLine, "application/javascript");
 
     expect(line.tokens).toEqual([{ kind: "plain", text: largeLine }]);
+  });
+});
+
+describe("code search", () => {
+  it("finds plain-text matches case-insensitively by default", () => {
+    expect(
+      findCodeSearchMatches("/tokens/\n/ToKeNs/", "/tokens/", {
+        matchCase: false,
+        wholeWord: false,
+        useRegex: false
+      }).matches
+    ).toEqual([
+      { start: 0, end: 8 },
+      { start: 9, end: 17 }
+    ]);
+  });
+
+  it("respects match-case and whole-word options", () => {
+    expect(
+      findCodeSearchMatches("token tokens tokenized", "token", {
+        matchCase: true,
+        wholeWord: true,
+        useRegex: false
+      }).matches
+    ).toEqual([{ start: 0, end: 5 }]);
+  });
+
+  it("supports regex search", () => {
+    expect(
+      findCodeSearchMatches("/tokens/ /values/", "\\/[a-z]+\\/", {
+        matchCase: true,
+        wholeWord: false,
+        useRegex: true
+      }).matches
+    ).toEqual([
+      { start: 0, end: 8 },
+      { start: 9, end: 17 }
+    ]);
+  });
+
+  it("supports slash-delimited regex literals like DevTools search", () => {
+    expect(
+      findCodeSearchMatches("status=OK\nresult=OK", "/OK/", {
+        matchCase: true,
+        wholeWord: false,
+        useRegex: true
+      }).matches
+    ).toEqual([
+      { start: 7, end: 9 },
+      { start: 17, end: 19 }
+    ]);
+  });
+
+  it("reports invalid regex patterns", () => {
+    expect(
+      findCodeSearchMatches("abc", "(", {
+        matchCase: true,
+        wholeWord: false,
+        useRegex: true
+      })
+    ).toEqual({ matches: [], error: "invalid-regex" });
+  });
+
+  it("normalizes CRLF before rendering/searching", () => {
+    expect(normalizeCodeViewText("a\r\nb\rc")).toBe("a\nb\nc");
   });
 });
 

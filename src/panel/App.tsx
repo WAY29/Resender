@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, FocusEvent } from "react";
+import type { FocusEvent } from "react";
 import type {
   BodyCapture,
   FilterState,
@@ -35,19 +35,17 @@ import {
 } from "./headers";
 import {
   formatCodeTextWithPrettier,
-  shouldDisableCodeFormatting,
-  shouldDisableCodeHighlighting,
   tokenizeCode,
   warmPrettierForMimeType
 } from "./codeView";
+import { CodeView } from "./codeViewer";
+import { JsonPreviewSearchView } from "./previewSearch";
 import { getNetworkIconData, NetworkIcon } from "./networkIcons";
 import { RequestTable } from "./requestTable";
 import {
   buildPreviewSrcDoc,
-  describeJsonValue,
   getDefaultPreviewScale,
   getFittedPreviewScale,
-  getJsonChildren,
   getPreviewImageSrc,
   getPreviewModel,
   isJsonComposite,
@@ -871,7 +869,7 @@ function BodyView({ title, body, mimeType }: { title: string; body: BodyCapture;
     <div className="body-view">
       <h3>{title}</h3>
       {body.kind === "text" || body.kind === "json" || body.kind === "form" ? (
-        <CodeView text={body.text ?? ""} mimeType={mimeType} />
+        <CodeView text={body.text ?? ""} mimeType={mimeType} searchable />
       ) : body.kind === "empty" ? (
         <p className="muted">{i18n.details.noBody}</p>
       ) : (
@@ -1098,7 +1096,7 @@ function PreviewView({ record }: { record: NetworkRecord }) {
 }
 
 function TextPreview({ text, mimeType }: { text: string; mimeType?: string }) {
-  return <CodeView text={text} mimeType={mimeType} />;
+  return <CodeView text={text} mimeType={mimeType} searchable />;
 }
 
 function JsonPreviewTree({ value }: { value: JsonValue }) {
@@ -1128,79 +1126,7 @@ function JsonPreviewTree({ value }: { value: JsonValue }) {
           </button>
         </div>
       ) : null}
-      <div className="json-tree" role="tree">
-        <JsonPreviewNode
-          nodeKey={Array.isArray(value) ? "[]" : "{}"}
-          value={value}
-          depth={0}
-          defaultExpanded
-          syncState={syncState}
-        />
-      </div>
-    </div>
-  );
-}
-
-function JsonPreviewNode(props: {
-  nodeKey: string;
-  value: JsonValue;
-  depth: number;
-  defaultExpanded?: boolean;
-  syncState: { expanded: boolean; version: number };
-}) {
-  const composite = isJsonComposite(props.value);
-  const [expanded, setExpanded] = useState(() => props.defaultExpanded ?? props.depth < 1);
-
-  useEffect(() => {
-    if (!composite) {
-      return;
-    }
-
-    setExpanded(props.syncState.expanded);
-  }, [composite, props.syncState]);
-
-  if (!composite) {
-    return (
-      <div className="json-node json-leaf" style={{ "--json-depth": props.depth } as CSSProperties}>
-        <span className="json-key">{props.nodeKey}</span>
-        <span className="json-separator">:</span>
-        <span className={`json-value json-value-${typeof props.value === "string" ? "string" : props.value === null ? "null" : typeof props.value}`}>
-          {describeJsonValue(props.value)}
-        </span>
-      </div>
-    );
-  }
-
-  const children = getJsonChildren(props.value);
-
-  return (
-    <div className="json-node-group" style={{ "--json-depth": props.depth } as CSSProperties}>
-      <button
-        type="button"
-        className="json-node json-node-toggle"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-      >
-        <span className={`json-chevron ${expanded ? "is-expanded" : ""}`} aria-hidden="true">
-          <ChevronDownIcon />
-        </span>
-        <span className="json-key">{props.nodeKey}</span>
-        <span className="json-separator">:</span>
-        <span className="json-summary">{describeJsonValue(props.value)}</span>
-      </button>
-      {expanded ? (
-        <div className="json-children" role="group">
-          {children.map((child) => (
-            <JsonPreviewNode
-              key={child.key}
-              nodeKey={child.key}
-              value={child.value}
-              depth={props.depth + 1}
-              syncState={props.syncState}
-            />
-          ))}
-        </div>
-      ) : null}
+      <JsonPreviewSearchView value={value} syncState={syncState} />
     </div>
   );
 }
@@ -1216,50 +1142,6 @@ function UnavailableBodyView(props: {
       <span>{translateReason(props.body.reason) ?? props.fallbackMessage}</span>
       {props.extraMessage ? <span>{props.extraMessage}</span> : null}
       {props.body.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(props.body.sizeBytes)}</span> : null}
-    </div>
-  );
-}
-
-function CodeView({ text, mimeType }: { text: string; mimeType?: string }) {
-  const [displayText, setDisplayText] = useState(() => text);
-  const formattingDisabled = shouldDisableCodeFormatting(text);
-  const highlightingDisabled = shouldDisableCodeHighlighting(text);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setDisplayText(text);
-    void formatCodeTextWithPrettier(text, mimeType).then((formatted) => {
-      if (!cancelled) {
-        setDisplayText(formatted);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mimeType, text]);
-
-  const lines = tokenizeCode(displayText, mimeType);
-
-  return (
-    <div className="code-view-shell">
-      {highlightingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewPlaintextFallback}</div> : null}
-      {!highlightingDisabled && formattingDisabled ? <div className="code-view-notice">{i18n.details.largeCodeViewFormattingFallback}</div> : null}
-      <div className="code-view">
-        {lines.map((line) => (
-          <div key={line.lineNumber} className="code-line">
-            <span className="line-number">{line.lineNumber}</span>
-            <code>
-              {line.tokens.map((token, index) => (
-                <span key={`${line.lineNumber}-${index}`} className={`token-${token.kind}`}>
-                  {token.text}
-                </span>
-              ))}
-            </code>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
