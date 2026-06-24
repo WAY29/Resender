@@ -944,15 +944,20 @@ button {
   gap: 10px;
   min-height: 22px;
   align-items: start;
+  overflow-x: auto;
 }
 
 .key-value span {
+  min-width: 0;
+  overflow-wrap: normal;
+  white-space: nowrap;
   color: var(--muted);
 }
 
 .key-value strong {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
   color: var(--text);
   font-weight: 400;
 }
@@ -1396,16 +1401,18 @@ button {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+  min-width: max-content;
   min-height: 24px;
   padding: 2px 8px 2px calc(8px + var(--json-depth, 0) * 16px);
   color: var(--code-text);
   font-family: var(--font-code);
   font-size: 13px;
   line-height: 1.5;
+  white-space: nowrap;
 }
 
 .json-node-toggle {
-  width: 100%;
+  width: max-content;
   border: 0;
   background: transparent;
   text-align: left;
@@ -1452,7 +1459,7 @@ button {
 .json-summary,
 .json-value {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .json-key {
