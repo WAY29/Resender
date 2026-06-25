@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { FilterState, NetworkRecord } from "../types";
 import { openSourceLocation } from "./chromeApi";
@@ -77,17 +77,14 @@ export function RequestTable(props: {
     };
   }, [menu]);
 
-  const menuStyle = useMemo(() => {
-    if (!menu || !containerRef.current) {
-      return undefined;
-    }
-
-    const bounds = containerRef.current.getBoundingClientRect();
-    return {
-      left: Math.max(8, menu.x - bounds.left),
-      top: Math.max(8, menu.y - bounds.top)
-    } as CSSProperties;
-  }, [menu]);
+  const menuStyle = menu
+    ? ({
+        left: Math.max(8, menu.x),
+        ...(menu.y > window.innerHeight / 2
+          ? { bottom: Math.max(8, window.innerHeight - menu.y) }
+          : { top: Math.max(8, menu.y) })
+      } as CSSProperties)
+    : undefined;
 
   async function writeText(text: string) {
     const copy = props.onCopyText ?? ((value: string) => navigator.clipboard.writeText(value));
@@ -233,6 +230,7 @@ export function RequestTable(props: {
             label={i18n.contextMenu.copy}
             submenu={menu.submenu === "copy"}
             onHover={() => setMenu((current) => (current ? { ...current, submenu: "copy" } : current))}
+            alignSubmenuUp={menu.y > window.innerHeight / 2}
           >
             <SubmenuButton label={i18n.contextMenu.copyUrl} onClick={() => copyRecord(menu.record, "url")} />
             <CopyFormatButton record={menu.record} format="curl-bash" label={i18n.contextMenu.copyAsCurlBash} onCopy={copyRecord} onStatus={props.onStatus} />
@@ -253,6 +251,7 @@ export function RequestTable(props: {
             label={i18n.contextMenu.filter}
             submenu={menu.submenu === "filter"}
             onHover={() => setMenu((current) => (current ? { ...current, submenu: "filter" } : current))}
+            alignSubmenuUp={menu.y > window.innerHeight / 2}
           >
             <SubmenuButton label={i18n.contextMenu.filterByDomain} onClick={() => appendFilter(buildDomainFilter(menu.record))} />
             <SubmenuButton label={i18n.contextMenu.filterByMethod} onClick={() => appendFilter(buildMethodFilter(menu.record))} />
@@ -294,13 +293,14 @@ function MenuItem(props: {
   label: string;
   submenu: boolean;
   onHover: () => void;
+  alignSubmenuUp: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="request-context-menu-item with-submenu" onMouseEnter={props.onHover}>
       <span>{props.label}</span>
       <span className="submenu-arrow">›</span>
-      {props.submenu ? <div className="request-context-submenu">{props.children}</div> : null}
+      {props.submenu ? <div className={`request-context-submenu ${props.alignSubmenuUp ? "align-up" : ""}`}>{props.children}</div> : null}
     </div>
   );
 }

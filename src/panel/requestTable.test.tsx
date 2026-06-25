@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FilterState, NetworkRecord } from "../types";
@@ -69,6 +69,43 @@ describe("RequestTable context menu", () => {
     await user.pointer([{ target: screen.getByText("Filter") }]);
     await user.click(await screen.findByRole("menuitem", { name: "Hide from list" }));
     expect(onFilterTokenAppend).toHaveBeenCalledWith('-url:https://api.example.test/users?role=admin');
+  });
+
+  it("opens upward near the viewport bottom", () => {
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(600);
+    render(
+      <RequestTable
+        records={[record()]}
+        selectedId={undefined}
+        filter={defaultFilter}
+        onSelect={vi.fn()}
+        onSortChange={vi.fn()}
+        onColumnResize={vi.fn()}
+        onFilterTokenAppend={vi.fn()}
+        onStatus={vi.fn()}
+        onCopyText={writeText}
+        listWidthPercent={100}
+        gridTemplate="34px 320px 86px 170px 78px 92px 160px 86px 80px"
+        columnWidths={{
+          name: 320,
+          method: 86,
+          domain: 170,
+          status: 78,
+          type: 92,
+          initiator: 160,
+          size: 86,
+          time: 80
+        }}
+        sortState={null}
+        isDetailsOpen={false}
+      />
+    );
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: /users/i }), { clientX: 48, clientY: 580 });
+
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveStyle({ bottom: "20px" });
+    expect(menu.style.top).toBe("");
   });
 
   it("copies all listed requests from the context menu", async () => {
