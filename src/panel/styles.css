@@ -923,6 +923,7 @@ button {
 .details-content.details-content-pane > .preview-view,
 .details-content.details-content-pane > .body-view {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -945,24 +946,26 @@ button {
 
 .key-value {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: minmax(24ch, 32ch) minmax(0, 1fr);
   gap: 10px;
   min-height: 22px;
   align-items: start;
   overflow-x: auto;
 }
 
-.key-value span {
+.key-value > span {
   min-width: 0;
-  overflow-wrap: normal;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
   color: var(--muted);
 }
 
-.key-value strong {
+.key-value > strong {
   min-width: 0;
-  overflow-wrap: normal;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
   color: var(--text);
   font-weight: 400;
 }
@@ -973,7 +976,9 @@ button {
 
 .code-view-shell,
 .preview-search-shell {
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
 }
 
@@ -1288,14 +1293,18 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
 }
 
 .details-scroll-pane {
   display: flex;
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -1310,16 +1319,21 @@ button {
 
 .preview-json-view {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
 }
 
 .preview-json-view > .preview-search-shell,
 .details-scroll-pane > .code-view-shell {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
 }
 
@@ -1575,7 +1589,6 @@ button {
 }
 
 .header-row {
-  grid-template-columns: 150px minmax(0, 1fr);
   padding: 2px 0;
 }
 
