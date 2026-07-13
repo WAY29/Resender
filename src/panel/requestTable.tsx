@@ -23,7 +23,8 @@ type MenuGroup = "open" | "copy" | "filter" | null;
 type ContextMenuState = {
   x: number;
   y: number;
-  record: NetworkRecord;
+  scope: "record" | "list";
+  record?: NetworkRecord;
   submenu: MenuGroup;
 };
 
@@ -179,7 +180,21 @@ export function RequestTable(props: {
           </div>
         ))}
       </div>
-      <div className="request-body">
+      <div
+        className="request-body"
+        onContextMenu={(event) => {
+          if (props.records.length === 0) {
+            return;
+          }
+
+          if ((event.target as HTMLElement).closest(".request-item")) {
+            return;
+          }
+
+          event.preventDefault();
+          setMenu({ x: event.clientX, y: event.clientY, scope: "list", submenu: null });
+        }}
+      >
         {props.records.length === 0 ? (
           <div className="empty-state">{i18n.table.noRequests}</div>
         ) : (
@@ -191,8 +206,11 @@ export function RequestTable(props: {
               onClick={() => props.onSelect(record.id)}
               onContextMenu={(event) => {
                 event.preventDefault();
-                props.onSelect(record.id);
-                setMenu({ x: event.clientX, y: event.clientY, record, submenu: null });
+                event.stopPropagation();
+                if (props.selectedId !== record.id) {
+                  props.onSelect(record.id);
+                }
+                setMenu({ x: event.clientX, y: event.clientY, scope: "record", record, submenu: null });
               }}
             >
               <RequestTypeIcon record={record} />
@@ -223,40 +241,46 @@ export function RequestTable(props: {
       </div>
       {menu ? (
         <div ref={menuRef} className="request-context-menu" style={menuStyle} role="menu">
-          <ContextMenuButton label={i18n.contextMenu.openInSources} onClick={() => openInSources(menu.record)} />
-          <ContextMenuButton label={i18n.contextMenu.openInNewTab} onClick={() => openInNewTab(menu.record)} />
-          <MenuDivider />
-          <MenuItem
-            label={i18n.contextMenu.copy}
-            submenu={menu.submenu === "copy"}
-            onHover={() => setMenu((current) => (current ? { ...current, submenu: "copy" } : current))}
-            alignSubmenuUp={menu.y > window.innerHeight / 2}
-          >
-            <SubmenuButton label={i18n.contextMenu.copyUrl} onClick={() => copyRecord(menu.record, "url")} />
-            <CopyFormatButton record={menu.record} format="curl-bash" label={i18n.contextMenu.copyAsCurlBash} onCopy={copyRecord} onStatus={props.onStatus} />
-            {isWindows ? <CopyFormatButton record={menu.record} format="curl-cmd" label={i18n.contextMenu.copyAsCurlCmd} onCopy={copyRecord} onStatus={props.onStatus} /> : null}
-            {isWindows ? <CopyFormatButton record={menu.record} format="powershell" label={i18n.contextMenu.copyAsPowerShell} onCopy={copyRecord} onStatus={props.onStatus} /> : null}
-            <CopyFormatButton record={menu.record} format="fetch" label={i18n.contextMenu.copyAsFetch} onCopy={copyRecord} onStatus={props.onStatus} />
-            <CopyFormatButton record={menu.record} format="fetch-node" label={i18n.contextMenu.copyAsFetchNode} onCopy={copyRecord} onStatus={props.onStatus} />
-            <MenuDivider />
-            <SubmenuButton label={i18n.contextMenu.copyAllListedUrls} onClick={() => void copyListed("url")} />
-            <SubmenuButton label={i18n.contextMenu.copyAllListedAsCurlBash} onClick={() => void copyListed("curl-bash")} />
-            {isWindows ? <SubmenuButton label={i18n.contextMenu.copyAllListedAsCurlCmd} onClick={() => void copyListed("curl-cmd")} /> : null}
-            {isWindows ? <SubmenuButton label={i18n.contextMenu.copyAllListedAsPowerShell} onClick={() => void copyListed("powershell")} /> : null}
-            <SubmenuButton label={i18n.contextMenu.copyAllListedAsFetch} onClick={() => void copyListed("fetch")} />
-            <SubmenuButton label={i18n.contextMenu.copyAllListedAsFetchNode} onClick={() => void copyListed("fetch-node")} />
-          </MenuItem>
-          <MenuDivider />
-          <MenuItem
-            label={i18n.contextMenu.filter}
-            submenu={menu.submenu === "filter"}
-            onHover={() => setMenu((current) => (current ? { ...current, submenu: "filter" } : current))}
-            alignSubmenuUp={menu.y > window.innerHeight / 2}
-          >
-            <SubmenuButton label={i18n.contextMenu.filterByDomain} onClick={() => appendFilter(buildDomainFilter(menu.record))} />
-            <SubmenuButton label={i18n.contextMenu.filterByMethod} onClick={() => appendFilter(buildMethodFilter(menu.record))} />
-            <SubmenuButton label={i18n.contextMenu.hideFromList} onClick={() => appendFilter(buildHideFromListFilter(menu.record))} />
-          </MenuItem>
+          {menu.scope === "record" && menu.record ? (
+            <>
+              <ContextMenuButton label={i18n.contextMenu.openInSources} onClick={() => openInSources(menu.record!)} />
+              <ContextMenuButton label={i18n.contextMenu.openInNewTab} onClick={() => openInNewTab(menu.record!)} />
+              <MenuDivider />
+              <MenuItem
+                label={i18n.contextMenu.copy}
+                submenu={menu.submenu === "copy"}
+                onHover={() => setMenu((current) => (current ? { ...current, submenu: "copy" } : current))}
+                alignSubmenuUp={menu.y > window.innerHeight / 2}
+              >
+                <SubmenuButton label={i18n.contextMenu.copyUrl} onClick={() => copyRecord(menu.record!, "url")} />
+                <CopyFormatButton record={menu.record!} format="curl-bash" label={i18n.contextMenu.copyAsCurlBash} onCopy={copyRecord} onStatus={props.onStatus} />
+                {isWindows ? <CopyFormatButton record={menu.record!} format="curl-cmd" label={i18n.contextMenu.copyAsCurlCmd} onCopy={copyRecord} onStatus={props.onStatus} /> : null}
+                {isWindows ? <CopyFormatButton record={menu.record!} format="powershell" label={i18n.contextMenu.copyAsPowerShell} onCopy={copyRecord} onStatus={props.onStatus} /> : null}
+                <CopyFormatButton record={menu.record!} format="fetch" label={i18n.contextMenu.copyAsFetch} onCopy={copyRecord} onStatus={props.onStatus} />
+                <CopyFormatButton record={menu.record!} format="fetch-node" label={i18n.contextMenu.copyAsFetchNode} onCopy={copyRecord} onStatus={props.onStatus} />
+              </MenuItem>
+              <MenuDivider />
+              <MenuItem
+                label={i18n.contextMenu.filter}
+                submenu={menu.submenu === "filter"}
+                onHover={() => setMenu((current) => (current ? { ...current, submenu: "filter" } : current))}
+                alignSubmenuUp={menu.y > window.innerHeight / 2}
+              >
+                <SubmenuButton label={i18n.contextMenu.filterByDomain} onClick={() => appendFilter(buildDomainFilter(menu.record!))} />
+                <SubmenuButton label={i18n.contextMenu.filterByMethod} onClick={() => appendFilter(buildMethodFilter(menu.record!))} />
+                <SubmenuButton label={i18n.contextMenu.hideFromList} onClick={() => appendFilter(buildHideFromListFilter(menu.record!))} />
+              </MenuItem>
+            </>
+          ) : (
+            <>
+              <ContextMenuButton label={i18n.contextMenu.copyAllListedUrls} onClick={() => void copyListed("url")} />
+              <ContextMenuButton label={i18n.contextMenu.copyAllListedAsCurlBash} onClick={() => void copyListed("curl-bash")} />
+              {isWindows ? <ContextMenuButton label={i18n.contextMenu.copyAllListedAsCurlCmd} onClick={() => void copyListed("curl-cmd")} /> : null}
+              {isWindows ? <ContextMenuButton label={i18n.contextMenu.copyAllListedAsPowerShell} onClick={() => void copyListed("powershell")} /> : null}
+              <ContextMenuButton label={i18n.contextMenu.copyAllListedAsFetch} onClick={() => void copyListed("fetch")} />
+              <ContextMenuButton label={i18n.contextMenu.copyAllListedAsFetchNode} onClick={() => void copyListed("fetch-node")} />
+            </>
+          )}
         </div>
       ) : null}
     </section>

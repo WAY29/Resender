@@ -19,6 +19,43 @@ beforeEach(() => {
 });
 
 describe("RequestTable context menu", () => {
+  it("keeps the current row selected when right-clicking it", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <RequestTable
+        records={[record()]}
+        selectedId="1"
+        filter={defaultFilter}
+        onSelect={onSelect}
+        onSortChange={vi.fn()}
+        onColumnResize={vi.fn()}
+        onFilterTokenAppend={vi.fn()}
+        onStatus={vi.fn()}
+        onCopyText={writeText}
+        listWidthPercent={100}
+        gridTemplate="34px 320px 86px 170px 78px 92px 160px 86px 80px"
+        columnWidths={{
+          name: 320,
+          method: 86,
+          domain: 170,
+          status: 78,
+          type: 92,
+          initiator: 160,
+          size: 86,
+          time: 80
+        }}
+        sortState={null}
+        isDetailsOpen={true}
+      />
+    );
+
+    await user.pointer([{ target: screen.getByRole("button", { name: /users/i }), keys: "[MouseRight]" }]);
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("copies URL and appends filter tokens from the context menu", async () => {
     const user = userEvent.setup();
     const onFilterTokenAppend = vi.fn();
@@ -56,6 +93,7 @@ describe("RequestTable context menu", () => {
     await user.pointer([{ target: row, keys: "[MouseRight]" }]);
 
     await user.pointer([{ target: screen.getByText("Copy") }]);
+    expect(screen.queryByRole("menuitem", { name: "Copy all listed URLs" })).not.toBeInTheDocument();
     const copyUrl = await screen.findByRole("menuitem", { name: "Copy URL" });
     await user.click(copyUrl);
     expect(writeText).toHaveBeenCalledWith("https://api.example.test/users?role=admin");
@@ -110,7 +148,7 @@ describe("RequestTable context menu", () => {
 
   it("copies all listed requests from the context menu", async () => {
     const user = userEvent.setup();
-    render(
+    const { container } = render(
       <RequestTable
         records={[
           record({ id: "a-id", url: "url-a", name: "a", method: "GET" }),
@@ -141,9 +179,8 @@ describe("RequestTable context menu", () => {
       />
     );
 
-    const row = screen.getAllByRole("button").find((element) => element.className.includes("request-item"))!;
-    await user.pointer([{ target: row, keys: "[MouseRight]" }]);
-    await user.pointer([{ target: screen.getByText("Copy") }]);
+    const body = container.querySelector(".request-body") as HTMLElement;
+    await user.pointer([{ target: body, coords: { x: 12, y: 80 }, keys: "[MouseRight]" }]);
     await user.click(await screen.findByRole("menuitem", { name: "Copy all listed URLs" }));
 
     expect(writeText).toHaveBeenCalledWith("url-a\nurl-b");
