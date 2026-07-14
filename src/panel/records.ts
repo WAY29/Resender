@@ -277,6 +277,23 @@ export function findMergeTarget(
   return findSameRequestNear(records, incoming, "har");
 }
 
+export function findRecordBySelectionId(
+  records: NetworkRecord[],
+  selectedId: string | undefined
+): NetworkRecord | undefined {
+  if (!selectedId) {
+    return undefined;
+  }
+
+  const direct = records.find((record) => record.id === selectedId);
+  if (direct) {
+    return direct;
+  }
+
+  const resendId = selectedId.startsWith("resend:") ? selectedId.slice("resend:".length) : undefined;
+  return resendId ? records.find((record) => record.resendId === resendId) : undefined;
+}
+
 export function linkRedirectRecords(records: NetworkRecord[]): NetworkRecord[] {
   const inferredRecords = records.map((record) => {
     if (record.status !== 0 || record.redirectTargetUrl) {

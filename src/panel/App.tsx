@@ -19,6 +19,7 @@ import { matchesFilter, parseNetworkFilterQuery } from "./filters";
 import { formatBytes, formatDuration } from "./format";
 import {
   applyHarResponseBody,
+  findRecordBySelectionId,
   findMergeTarget,
   linkRedirectRecords,
   mergeRecords,
@@ -109,7 +110,7 @@ export function App() {
   const captureEnabledRef = useRef(captureEnabled);
 
   const bodyLimitBytes = Math.max(1, bodyLimitMb) * 1024 * 1024;
-  const selectedRecord = records.find((record) => record.id === selectedId);
+  const selectedRecord = findRecordBySelectionId(records, selectedId);
 
   const parsedFilterQuery = useMemo(() => parseNetworkFilterQuery(filter.query), [filter.query]);
 
@@ -330,7 +331,7 @@ export function App() {
       <section className="workbench" ref={workbenchRef}>
         <RequestTable
           records={filteredRecords}
-          selectedId={selectedId}
+          selectedId={selectedRecord?.id}
           filter={filter}
           onSelect={selectRecord}
           onSortChange={(column) => setSortState((current) => nextSortState(current, column))}

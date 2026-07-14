@@ -3,6 +3,7 @@ import type { NetworkRecord } from "../types";
 import { i18n } from "./i18n";
 import {
   applyHarResponseBody,
+  findRecordBySelectionId,
   findMergeTarget,
   linkRedirectRecords,
   mergeRecords,
@@ -527,6 +528,18 @@ describe("findMergeTarget", () => {
         }
       })
     ]);
+  });
+});
+
+describe("findRecordBySelectionId", () => {
+  it("resolves a resend selection to the row it was merged into", () => {
+    const merged = record("hook:1", {
+      source: "hook",
+      resendId: "abc",
+      resent: true
+    });
+
+    expect(findRecordBySelectionId([merged], "resend:abc")).toBe(merged);
   });
 });
 
