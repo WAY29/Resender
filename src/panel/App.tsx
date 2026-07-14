@@ -644,7 +644,15 @@ function RequestDetails(props: {
           {sending ? i18n.details.sending : i18n.details.send}
         </button>
       </div>
-      <div className={`details-content${props.activeTab === "preview" || props.activeTab === "response" ? " details-content-pane" : ""}`}>
+      <div
+        className={`details-content${
+          props.activeTab === "preview" || props.activeTab === "response"
+            ? " details-content-pane"
+            : props.activeTab === "payload"
+              ? " details-content-payload"
+            : ""
+        }`}
+      >
         {disabledReason ? <div className="warning detail-warning">{disabledReason}</div> : null}
         {props.activeTab === "headers" ? (
           <HeadersView
@@ -811,7 +819,7 @@ function PayloadEditor(props: {
           onChange={props.onQueryParamsChange}
         />
       </DetailSection>
-      <section className="detail-section">
+      <section className="detail-section payload-body-section">
         <div className="section-title-row">
           <h3>{i18n.details.requestBody}</h3>
           <button
@@ -832,12 +840,14 @@ function PayloadEditor(props: {
             {props.bodyCapture.sizeBytes !== undefined ? <span>{i18n.details.size}: {formatBytes(props.bodyCapture.sizeBytes)}</span> : null}
           </div>
         ) : null}
-        <EditableCodeEditor
-          value={props.body}
-          placeholder={i18n.details.editRequestBody}
-          mimeType={props.mimeType}
-          onChange={props.onBodyChange}
-        />
+        <div className="details-scroll-pane">
+          <EditableCodeEditor
+            value={props.body}
+            placeholder={i18n.details.editRequestBody}
+            mimeType={props.mimeType}
+            onChange={props.onBodyChange}
+          />
+        </div>
       </section>
     </div>
   );

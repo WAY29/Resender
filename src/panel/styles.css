@@ -927,6 +927,17 @@ button {
   min-height: 0;
 }
 
+.details-content.details-content-payload {
+  display: flex;
+  flex-direction: column;
+}
+
+.details-content.details-content-payload > .payload-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
 
 .detail-warning {
   margin-bottom: 12px;
@@ -1163,7 +1174,10 @@ button {
 
 .editable-code-editor {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 220px;
+  height: 100%;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--code-bg);
@@ -1183,6 +1197,7 @@ button {
   z-index: 1;
   width: 100%;
   min-height: 220px;
+  height: 100%;
   padding: 0;
   border: 0;
   outline: 0;
@@ -1289,7 +1304,8 @@ button {
 }
 
 .preview-view,
-.body-view {
+.body-view,
+.payload-editor {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1297,6 +1313,22 @@ button {
   min-height: 0;
   width: 100%;
   height: 100%;
+}
+
+.payload-editor > .detail-section {
+  margin-bottom: 0;
+}
+
+.payload-body-section {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.payload-body-section > .details-scroll-pane > .editable-code-editor {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .details-scroll-pane {
